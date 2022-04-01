@@ -82,7 +82,7 @@ namespace DurableLockFunctionApp
         public static async Task<HttpResponseMessage> DeleteLock([HttpTrigger(AuthorizationLevel.Anonymous, "get", "post", Route = "Delete" + LockName + "/{LockId}")] HttpRequestMessage req,
                                                                  [DurableClient] IDurableClient client,
                                                                  string lockId)
-            => await client.DeleteDurableLock(LockType, lockId);
+            => await client.DeleteDurableLock(LockName, LockType, lockId);
 
         /// <summary>
         /// Get all locks, this Api call is not needed since the GetLocks call in the SharedLockApi gives the same functionality,
