@@ -13,9 +13,9 @@ namespace DurableLockFunctionApp
     /// </summary>
     public static class GenericLockApi
     {
-        #region Constants: no need to modify
+        #region Constants: LockName can be modified to a another name
 
-        const string LockName = "Lock";
+        const string LockName = "GenericLock";
 
         #endregion
 
@@ -27,15 +27,15 @@ namespace DurableLockFunctionApp
         /// <param name="lockId">Lock Id to lock on</param>
         /// <param name="waitForResultSeconds">Specify how long to wait for a result before a 202 is returned, default to 5 seconds if ommited</param>
         /// <returns></returns>
-        [FunctionName("Set" + LockName)]
-        public static async Task<HttpResponseMessage> Lock([HttpTrigger(AuthorizationLevel.Anonymous, "get", "post", Route = LockName + "/{LockType}/{LockId}/{waitForResultSeconds:int?}")] HttpRequestMessage req,
+        [FunctionName("Lock")]
+        public static async Task<HttpResponseMessage> Lock([HttpTrigger(AuthorizationLevel.Anonymous, "get", "post", Route = "Lock/{LockType}/{LockId}/{waitForResultSeconds:int?}")] HttpRequestMessage req,
                                                                   [DurableClient] IDurableClient client,
                                                                   string lockType,
                                                                   string lockId,
                                                                   int? waitForResultSeconds)
             => await LockOrchestrationStart(req,
                                               client,
-                                              lockType + "Lock",
+                                              lockType,
                                               lockId,
                                               waitForResultSeconds,
                                               DurableLockHelper.Lock);
@@ -46,15 +46,15 @@ namespace DurableLockFunctionApp
         /// <param name="lockId">Lock Id to lock on</param>
         /// <param name="waitForResultSeconds">Specify how long to wait for a result before a 202 is returned, default to 5 seconds if ommited</param>
         /// <returns></returns>
-        [FunctionName("Un" + LockName)]
-        public static async Task<HttpResponseMessage> UnLock([HttpTrigger(AuthorizationLevel.Anonymous, "get", "post", Route = "Un" + LockName + "/{LockType}/{LockId}/{waitForResultSeconds:int?}")] HttpRequestMessage req,
+        [FunctionName("UnLock")]
+        public static async Task<HttpResponseMessage> UnLock([HttpTrigger(AuthorizationLevel.Anonymous, "get", "post", Route = "UnLock/{LockType}/{LockId}/{waitForResultSeconds:int?}")] HttpRequestMessage req,
                                                              [DurableClient] IDurableClient client,
                                                              string lockType,
                                                              string lockId,
                                                              int? waitForResultSeconds)
             => await LockOrchestrationStart(req,
                                               client,
-                                              lockType + "Lock",
+                                              lockType,
                                               lockId,
                                               waitForResultSeconds,
                                               DurableLockHelper.UnLock);
@@ -64,12 +64,12 @@ namespace DurableLockFunctionApp
         /// </summary>
         /// <param name="lockId">Lock Id to lock on</param>
         /// <returns></returns>
-        [FunctionName("Read" + LockName)]
-        public static async Task<HttpResponseMessage> ReadLock([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "Read" + LockName + "/{LockType}/{LockId}")] HttpRequestMessage req,
+        [FunctionName("ReadLock")]
+        public static async Task<HttpResponseMessage> ReadLock([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "ReadLock/{LockType}/{LockId}")] HttpRequestMessage req,
                                                                [DurableClient] IDurableEntityClient client,
                                                                string lockType,
                                                                string lockId)
-            => await client.ReadDurableLock(lockType, lockId);
+            => await client.ReadDurableLock(LockName, $"{lockType}@{lockId}");
 
 
         /// <summary>
@@ -77,22 +77,12 @@ namespace DurableLockFunctionApp
         /// </summary>
         /// <param name="lockId">Lock Id to lock on</param>
         /// <returns></returns>
-        [FunctionName("Delete" + LockName)]
-        public static async Task<HttpResponseMessage> DeleteLock([HttpTrigger(AuthorizationLevel.Anonymous, "get", "post", Route = "Delete" + LockName + "/{LockType}/{LockId}")] HttpRequestMessage req,
+        [FunctionName("DeleteLock")]
+        public static async Task<HttpResponseMessage> DeleteLock([HttpTrigger(AuthorizationLevel.Anonymous, "get", "post", Route = "DeleteLock/{LockType}/{LockId}")] HttpRequestMessage req,
                                                                  [DurableClient] IDurableClient client,
                                                                  string lockType,
                                                                  string lockId)
             => await client.DeleteDurableLock(lockType, lockId);
-
-        /// <summary>
-        /// Get all locks
-        /// </summary>
-        /// <returns></returns>
-        [FunctionName("Get" + LockName + "s")]
-        public static async Task<HttpResponseMessage> GetLocks([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "Get" + LockName + "s/{LockType?}")] HttpRequestMessage req,
-                                                               [DurableClient] IDurableClient client,
-                                                               string lockType)
-            => await client.GetDurableLocks(lockType);
 
         #endregion
 
@@ -114,9 +104,11 @@ namespace DurableLockFunctionApp
         /// </summary>
         /// <returns></returns>
         [Deterministic]
-        [FunctionName(LockName + "Orchestration")]
+        [FunctionName("GenericLockOrchestration")]
         public static async Task<bool> LockOrchestration([OrchestrationTrigger] IDurableOrchestrationContext context)
-            => await context.LockOrchestration(LockName);
+        {
+            return await context.LockOrchestration(LockName);
+        }
 
         #endregion
 
@@ -136,7 +128,7 @@ namespace DurableLockFunctionApp
                                                                                 int? waitForResultSeconds,
                                                                                 string opName)
             => await client.DurableLockOrchestrationStart(req,
-                                                     LockName + "Orchestration",
+                                                     "GenericLockOrchestration",
                                                      lockType,
                                                      lockId,
                                                      waitForResultSeconds,

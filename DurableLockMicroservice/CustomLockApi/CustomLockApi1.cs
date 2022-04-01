@@ -68,7 +68,7 @@ namespace DurableLockFunctionApp
         public static async Task<HttpResponseMessage> ReadLock([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "Read" + LockName + "/{LockId}")] HttpRequestMessage req,
                                                                [DurableClient] IDurableEntityClient client,
                                                                string lockId)
-            => await client.ReadDurableLock(LockType, lockId);
+            => await client.ReadDurableLock(LockType + "Lock", LockType + "@" + lockId);
 
 
         /// <summary>
@@ -83,13 +83,14 @@ namespace DurableLockFunctionApp
             => await client.DeleteDurableLock(LockType, lockId);
 
         /// <summary>
-        /// Get all locks
+        /// Get all locks, this Api call is not needed since the GetLocks call in the SharedLockApi gives the same functionality,
+        /// but this can be added if this type of call is prefered
         /// </summary>
         /// <returns></returns>
-        [FunctionName("Get" + LockName + "s")]
-        public static async Task<HttpResponseMessage> GetLocks([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "Get" + LockName + "s")] HttpRequestMessage req,
-                                                               [DurableClient] IDurableClient client)
-            => await client.GetDurableLocks(LockType);
+        //[FunctionName("Get" + LockName + "s")]
+        //public static async Task<HttpResponseMessage> GetLocks([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "Get" + LockName + "s")] HttpRequestMessage req,
+        //                                                       [DurableClient] IDurableClient client)
+        //    => await client.GetDurableLocks(LockType);
 
         #endregion
 

@@ -9,9 +9,13 @@ namespace DurableLockLibrary
     /// </summary>
     public static class DurableLockHelper
     {
+        #region Constants
+
         public const string Lock = "lock";
         public const string UnLock = "unlock";
         public const string DeleteLock = "deletelock";
+
+        #endregion
 
         #region DurableClient helpers
 
@@ -90,9 +94,9 @@ namespace DurableLockLibrary
         /// <param name="client">DurableClient</param>
         /// <param name="lockType">This string value is the name of the type of lock</param>
         /// <returns>200</returns>
-        public static async Task<HttpResponseMessage> GetDurableLocks(this IDurableClient client, string lockType)
+        public static async Task<HttpResponseMessage> GetDurableLocks(this IDurableClient client, string lockName, string lockType = "")
         {
-            Dictionary<string, int> result = new();
+            Dictionary<string, bool> result = new();
             EntityQueryResult? res = null;
 
             using (CancellationTokenSource cts = new())
@@ -100,14 +104,24 @@ namespace DurableLockLibrary
                 res = await client.ListEntitiesAsync(new EntityQuery()
                 {
                     PageSize = 99999999,
-                    EntityName = !string.IsNullOrWhiteSpace(lockType) ? lockType + "Lock" : "",
+                    EntityName = !string.IsNullOrWhiteSpace(lockName) ? lockName + "Lock" : "",
                     FetchState = true
                 }, cts.Token);
             }
 
-            foreach (DurableEntityStatus? rr in res.Entities)
+            if (!string.IsNullOrWhiteSpace(lockType))
             {
-                result.Add(rr.EntityId.EntityKey, (int)rr.State);
+                foreach (DurableEntityStatus? rr in res.Entities.Where(e => e.EntityId.EntityKey.StartsWith(lockType + "@")))
+                {
+                    result.Add(rr.EntityId.EntityKey, (bool)rr.State);
+                }
+            }
+            else
+            {
+                foreach (DurableEntityStatus? rr in res.Entities)
+                {
+                    result.Add(rr.EntityId.EntityKey, (bool)rr.State);
+                }
             }
 
             StringContent? content = new(JsonSerializer.Serialize(result));
@@ -129,11 +143,11 @@ namespace DurableLockLibrary
         /// <param name="lockType">This string value is the name of the type of lock</param>
         /// <param name="lockId">This string value is the key for the lock type</param>
         /// <returns>200 and true for locked and false for unlocked</returns>
-        public static async Task<HttpResponseMessage> ReadDurableLock(this IDurableEntityClient client, string lockType, string lockId)
+        public static async Task<HttpResponseMessage> ReadDurableLock(this IDurableEntityClient client, string entityId, string entityKey)
         {
-            EntityId entityId = new($"{lockType}Lock", $"{lockType}@{lockId}");
+            EntityId entId = new(entityId, entityKey);
 
-            EntityStateResponse<bool> IsLocked = await client.ReadEntityStateAsync<bool>(entityId);
+            EntityStateResponse<bool> IsLocked = await client.ReadEntityStateAsync<bool>(entId);
 
             HttpResponseMessage respsone = new(HttpStatusCode.OK)
             {
