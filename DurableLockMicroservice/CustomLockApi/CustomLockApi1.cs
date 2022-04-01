@@ -71,6 +71,7 @@ namespace DurableLockFunctionApp
             => await client.ReadDurableLock(LockType + "Lock", LockType + "@" + lockId);
 
 
+
         /// <summary>
         /// Delete lock state with DurableClient
         /// </summary>
