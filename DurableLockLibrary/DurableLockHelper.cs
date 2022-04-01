@@ -29,7 +29,7 @@ namespace DurableLockLibrary
         /// <param name="lockId">This string value is the key for the lock type</param>
         /// <param name="waitForResultSeconds">Specify how long to wait for a result before a 202 is returned,
         ///                                    default to 5 seconds if ommited</param>
-        /// <param name="opName">Constants for this is in the DurableLock class, can be "lock", "unlock" or "delete"</param>
+        /// <param name="opName">Constants for this is in this class above, can be "lock", "unlock" or "delete"</param>
         /// <returns>200, or 202 if it takes longer than waitForResultSeconds, default is 5 seconds if omitted</returns>
         public static async Task<HttpResponseMessage> DurableLockOrchestrationStart(this IDurableClient client,
                                                                                   HttpRequestMessage req,
@@ -52,10 +52,16 @@ namespace DurableLockLibrary
 
             if (orchResponse.StatusCode == HttpStatusCode.OK)
             {
-                respsone = new(HttpStatusCode.OK)
+                string result = await orchResponse.Content.ReadAsStringAsync();
+
+                if (result.Equals("true", StringComparison.OrdinalIgnoreCase))
                 {
-                    Content = new StringContent(await orchResponse.Content.ReadAsStringAsync())
-                };
+                    respsone = new(HttpStatusCode.OK);
+                }
+                else
+                {
+                    respsone = opName.Equals("lock") ? new(HttpStatusCode.Locked) : new(HttpStatusCode.OK);
+                }
             }
             else if (orchResponse.StatusCode == HttpStatusCode.Accepted)
             {
@@ -79,9 +85,9 @@ namespace DurableLockLibrary
         /// <param name="lockType">This string value is the name of the type of lock</param>
         /// <param name="lockId">This string value is the key for the lock type</param>
         /// <returns>200</returns>
-        public static async Task<HttpResponseMessage> DeleteDurableLock(this IDurableClient client, string lockType, string lockId)
+        public static async Task<HttpResponseMessage> DeleteDurableLock(this IDurableClient client, string lockName,  string lockType, string lockId)
         {
-            EntityId entityId = new(lockType + "Lock", $"{lockType}@{lockId}");
+            EntityId entityId = new(lockName, $"{lockType}@{lockId}");
 
             await client.SignalEntityAsync(entityId, DurableLockHelper.DeleteLock);
 

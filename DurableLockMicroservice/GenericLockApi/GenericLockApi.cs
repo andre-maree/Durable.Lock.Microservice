@@ -82,7 +82,7 @@ namespace DurableLockFunctionApp
                                                                  [DurableClient] IDurableClient client,
                                                                  string lockType,
                                                                  string lockId)
-            => await client.DeleteDurableLock(lockType, lockId);
+            => await client.DeleteDurableLock(LockName, lockType, lockId);
 
         #endregion
 

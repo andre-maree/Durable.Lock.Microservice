@@ -80,7 +80,7 @@ namespace DurableLockFunctionApp
         public static async Task<HttpResponseMessage> DeleteLock([HttpTrigger(AuthorizationLevel.Anonymous, "get", "post", Route = "Delete" + LockName + "/{LockId}")] HttpRequestMessage req,
                                                                  [DurableClient] IDurableClient client,
                                                                  string lockId)
-            => await client.DeleteDurableLock(LockType, lockId);
+            => await client.DeleteDurableLock(LockName, LockType, lockId);
 
         /// <summary>
         /// Get all locks, this Api call is not needed since the GetLocks call in the SharedLockApi gives the same functionality,
@@ -123,7 +123,7 @@ namespace DurableLockFunctionApp
         /// <summary>
         /// Re-used method for lock orchestrations
         /// </summary>
-        /// <param name="lockId">>Lock Id to lock on</param>
+        /// <param name="lockId">Lock Id to lock on</param>
         /// <param name="waitForResultSeconds">Specify how long to wait for a result before a 202 is returned, default is 5 seconds if ommited</param>
         /// <param name="opName">Lock operation name</param>
         /// <returns></returns>
