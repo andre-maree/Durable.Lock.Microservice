@@ -40,7 +40,7 @@ namespace DurableLockFunctionApp
                                               client,
                                               lockId,
                                               waitForResultSeconds,
-                                              DurableLockHelper.Lock);
+                                              Constants.Lock);
 
         /// <summary>
         /// Unlock with DurableClient
@@ -57,7 +57,7 @@ namespace DurableLockFunctionApp
                                               client,
                                               lockId,
                                               waitForResultSeconds,
-                                              DurableLockHelper.UnLock);
+                                              Constants.UnLock);
 
         /// <summary>
         /// This is used to check if there is a lock with DurableEntityClient
