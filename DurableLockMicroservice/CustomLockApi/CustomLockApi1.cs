@@ -36,11 +36,7 @@ namespace DurableLockFunctionApp
                                                                   [DurableClient] IDurableClient client,
                                                                   string lockId,
                                                                   int? waitForResultSeconds)
-            => await LockOrchestrationStart(req,
-                                              client,
-                                              lockId,
-                                              waitForResultSeconds,
-                                              Constants.Lock);
+            => await client.ExcecuteLock(req, LockType + "LockOrchestration", LockName, LockType, lockId, waitForResultSeconds, false);
 
         /// <summary>
         /// Unlock with DurableClient
@@ -48,16 +44,18 @@ namespace DurableLockFunctionApp
         /// <param name="lockId">Lock Id to lock on</param>
         /// <param name="waitForResultSeconds">Specify how long to wait for a result before a 202 is returned, default to 5 seconds if ommited</param>
         /// <returns></returns>
-        [FunctionName("Un" + ActionName)]
-        public static async Task<HttpResponseMessage> UnLock([HttpTrigger(AuthorizationLevel.Anonymous, "get", "post", Route = "Un" + ActionName + "/{LockId}/{waitForResultSeconds:int?}")] HttpRequestMessage req,
+        [FunctionName("UnLock" + LockType)]
+        public static async Task<HttpResponseMessage> UnLock([HttpTrigger(AuthorizationLevel.Anonymous, "get", "post", Route = "UnLock" + LockType + "/{LockId}/{waitForResultSeconds:int?}")] HttpRequestMessage req,
                                                              [DurableClient] IDurableClient client,
                                                              string lockId,
                                                              int? waitForResultSeconds)
-            => await LockOrchestrationStart(req,
-                                              client,
+            => await client.DurableLockOrchestrationStart(req,
+                                              LockType + "LockOrchestration",
+                                              LockType,
                                               lockId,
                                               waitForResultSeconds,
-                                              Constants.UnLock);
+                                              Constants.UnLock,
+                                              false);
 
         /// <summary>
         /// This is used to check if there is a lock with DurableEntityClient
@@ -112,7 +110,7 @@ namespace DurableLockFunctionApp
         /// </summary>
         /// <returns></returns>
         [Deterministic]
-        [FunctionName(LockName + "Orchestration")]
+        [FunctionName(LockType + "LockOrchestration")]
         public static async Task<bool> LockOrchestration([OrchestrationTrigger] IDurableOrchestrationContext context)
             => await context.LockOrchestration(LockName);
 
@@ -127,17 +125,17 @@ namespace DurableLockFunctionApp
         /// <param name="waitForResultSeconds">Specify how long to wait for a result before a 202 is returned, default is 5 seconds if ommited</param>
         /// <param name="opName">Lock operation name</param>
         /// <returns></returns>
-        private static async Task<HttpResponseMessage> LockOrchestrationStart(HttpRequestMessage req,
-                                                                                IDurableClient client,
-                                                                                string lockId,
-                                                                                int? waitForResultSeconds,
-                                                                                string opName)
-            => await client.DurableLockOrchestrationStart(req,
-                                                     LockName + "Orchestration",
-                                                     LockType,
-                                                     lockId,
-                                                     waitForResultSeconds,
-                                                     opName);
+        //private static async Task<HttpResponseMessage> LockOrchestrationStart(HttpRequestMessage req,
+        //                                                                        IDurableClient client,
+        //                                                                        string lockId,
+        //                                                                        int? waitForResultSeconds,
+        //                                                                        string opName)
+        //    => await client.DurableLockOrchestrationStart(req,
+        //                                             LockName + "Orchestration",
+        //                                             LockType,
+        //                                             lockId,
+        //                                             waitForResultSeconds,
+        //                                             opName);
 
         #endregion
     }

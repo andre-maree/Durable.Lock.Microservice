@@ -35,152 +35,10 @@ namespace DurableLockFunctionApp
                                                                   [DurableClient] IDurableClient client,
                                                                   string lockType,
                                                                   string lockId,
-                                                                  int? waitForResultSeconds)
-        {
-           ////get locks input list from post data
-           //List < HttpLockOperation > lockOps = new()
-           //{
-           //    new HttpLockOperation() { LockId = "a1", LockType = lockType },
-           //    new HttpLockOperation() { LockId = "a2", LockType = lockType, PermanentLock = true },
-           //    new HttpLockOperation() { LockId = "a3", LockType = lockType }
-           //};
+                                                                  int? waitForResultSeconds) 
+            => await client.ExcecuteLock(req, "GenericLockOrchestration", LockName, lockType, lockId, waitForResultSeconds, true);
 
-            string content = await req.Content.ReadAsStringAsync();
 
-            var mainLockOp = new HttpLockOperation()
-            {
-                LockId = lockId,
-                LockType = lockType
-            };
-
-            // no other locks posted, just main lock
-            if (string.IsNullOrWhiteSpace(content))
-            {
-                var result = await ExecuteLock(req, client, waitForResultSeconds, mainLockOp, Constants.Lock);
-
-                return result.HttpLockResponse;
-            }
-
-            List<HttpLockOperation> lockOps = JsonSerializer.Deserialize<List<HttpLockOperation>>(content);
-
-            /////////////////////////////// reads //////////////////////////////////
-            // 1st just do quick reads on all locks, no need to try do lock orchestrations if a read returns locked 423, exit
-
-            List <Task<HttpResponseMessage>> readTasks = new() { client.ReadDurableLock(LockName, $"{lockType}@{lockId}") };
-
-            foreach (HttpLockOperation loclOp in lockOps)
-            {
-                readTasks.Add(client.ReadDurableLock(LockName, $"{loclOp.LockType}@{loclOp.LockId}"));
-            }
-
-            int readCount = 0;
-
-            while (readCount < readTasks.Count)
-            {
-                Task<HttpResponseMessage> readTask = await Task.WhenAny<HttpResponseMessage>(readTasks);
-
-                // if any read says locked then bail out
-                if (readTask.Result.StatusCode != HttpStatusCode.OK)
-                {
-                    return new HttpResponseMessage(readTask.Result.StatusCode);
-                }
-
-                readCount++;
-            }
-
-            /////////////////////// all reads said unlocked, continue below /////////////////////////////////
-            // now do lock orhestrations
-
-            List<Task<HttpLockOperation>> lockResponses = new();
-            List<Task<HttpLockOperation>> unlockResponses = new();
-            List<HttpLockOperation> lockedLi = new();
-
-            foreach (HttpLockOperation lockOp in lockOps)
-            {
-                lockResponses.Add(ExecuteLock(req, client, waitForResultSeconds, lockOp, Constants.Lock));
-            }
-
-            bool hasConflict = false;
-
-            while (lockResponses.Count > 0)
-            {
-                Task<HttpLockOperation> lockOpTask = await Task.WhenAny<HttpLockOperation>(lockResponses);
-
-                HttpLockOperation lockOp = lockOpTask.Result;
-
-                lockResponses.Remove(lockOpTask);
-
-                if (lockOp.HttpLockResponse.StatusCode == HttpStatusCode.Created)
-                {
-                    if (hasConflict)
-                    {
-                        unlockResponses.Add(ExecuteLock(req, client, waitForResultSeconds, lockOp, Constants.UnLock));
-                    }
-                    else
-                    {
-                        lockedLi.Add(lockOp);
-                    }
-                }
-                // conflict check
-                else if (lockOp.HttpLockResponse.StatusCode == HttpStatusCode.Conflict && !hasConflict)
-                {
-                    hasConflict = true;
-
-                    // conflict found, wait for all locks and then unlock
-                    foreach (HttpLockOperation locked in lockedLi)
-                    {
-                        unlockResponses.Add(ExecuteLock(req, client, waitForResultSeconds, lockOp, Constants.UnLock));
-                    }
-                }
-            }
-
-            if (hasConflict) // if a conflict was found, wait for the unlocks
-            {
-                await Task.WhenAll<HttpLockOperation>(unlockResponses);
-
-                return new HttpResponseMessage(HttpStatusCode.Conflict);
-            }
-
-            // now it is safe to attempt the main lock
-            var lastLock = await ExecuteLock(req, client, waitForResultSeconds, mainLockOp, Constants.Lock);
-
-            // success path
-            if (lastLock.HttpLockResponse.StatusCode == HttpStatusCode.Created)
-            {
-                // unlock the non-permanent locks only
-                foreach (HttpLockOperation lockOp in lockedLi.FindAll(l => !l.StayLocked))
-                {
-                    unlockResponses.Add(ExecuteLock(req, client, waitForResultSeconds, lockOp, Constants.UnLock));
-                }
-
-                await Task.WhenAll<HttpLockOperation>(unlockResponses);
-
-                // exit success
-                return lastLock.HttpLockResponse;
-            }
-
-            // conflict found on the last main lock, unlock all that was locked
-            foreach (HttpLockOperation lockOp in lockedLi)
-            {
-                lockResponses.Add(ExecuteLock(req, client, waitForResultSeconds, lockOp, Constants.UnLock));
-            }
-
-            await Task.WhenAll<HttpLockOperation>(lockResponses);
-
-            return new HttpResponseMessage(HttpStatusCode.Conflict);
-        }
-
-        private static async Task<HttpLockOperation> ExecuteLock(HttpRequestMessage req, IDurableClient client, int? waitForResultSeconds, HttpLockOperation lockOp, string lockOperstion)
-        {
-            lockOp.HttpLockResponse = await client.DurableLockOrchestrationStart(req,
-                                              "GenericLockOrchestration",
-                                                               lockOp.LockType,
-                                                               lockOp.LockId,
-                                                               waitForResultSeconds,
-                                                               lockOperstion);
-
-            return lockOp;
-        }
 
         /// <summary>
         /// Unlock with DurableClient
@@ -199,7 +57,8 @@ namespace DurableLockFunctionApp
                                               lockType,
                                               lockId,
                                               waitForResultSeconds,
-                                              Constants.UnLock);
+                                              Constants.UnLock,
+                                              true);
 
         /// <summary>
         /// This is used to check if there is a lock with DurableEntityClient
@@ -212,6 +71,76 @@ namespace DurableLockFunctionApp
                                                                string lockType,
                                                                string lockId)
             => await client.ReadDurableLock(LockName, $"{lockType}@{lockId}");
+
+        /// <summary>
+        /// This is used to read locks with DurableEntityClient
+        /// </summary>
+        /// <returns></returns>
+        [FunctionName("ReadLocks")]
+        public static async Task<HttpResponseMessage> ReadLocks([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "ReadLocks/{RespondWhen1stLockFound}")] HttpRequestMessage req,
+                                                               [DurableClient] IDurableEntityClient client,
+                                                               bool RespondWhen1stLockFound)
+        {
+            string content = await req.Content.ReadAsStringAsync();
+
+            List<HttpLockOperation> lockOps = JsonSerializer.Deserialize<List<HttpLockOperation>>(content);
+
+            List<Task<HttpLockOperation>> readTasks = new();
+
+            foreach (HttpLockOperation lockOp in lockOps)
+            {
+                readTasks.Add(client.ExecuteRead(LockName, lockOp));
+            }
+
+            int readCount = 0;
+
+            if (RespondWhen1stLockFound)
+            {
+                while (readCount < readTasks.Count)
+                {
+                    Task<HttpLockOperation> readTask = await Task.WhenAny<HttpLockOperation>(readTasks);
+
+                    // if any read says locked then bail out
+                    if (readTask.Result.HttpLockResponse.StatusCode != HttpStatusCode.OK)
+                    {
+                        return new HttpResponseMessage(readTask.Result.HttpLockResponse.StatusCode)
+                        {
+                            Content = new StringContent(JsonSerializer.Serialize(new LockOperation() { LockType = readTask.Result.LockType, LockId = readTask.Result.LockId }))
+                        };
+                    }
+
+                    readCount++;
+                }
+            }
+
+            List<LockOperation> output = new List<LockOperation>();
+            bool isLocked = false;
+
+            while (readCount < readTasks.Count)
+            {
+                Task<HttpLockOperation> readTask = await Task.WhenAny<HttpLockOperation>(readTasks);
+
+                // read all
+                if (readTask.Result.HttpLockResponse.StatusCode != HttpStatusCode.OK)
+                {
+                    isLocked = true;
+
+                    output.Add(new LockOperation() { LockType = readTask.Result.LockType, LockId = readTask.Result.LockId });
+                }
+
+                readCount++;
+            }
+
+            if (!isLocked)
+            {
+                return new HttpResponseMessage(HttpStatusCode.OK);
+            }
+
+            return new HttpResponseMessage(HttpStatusCode.Locked)
+            {
+                Content = new StringContent(JsonSerializer.Serialize(output))
+            };
+        }
 
 
         /// <summary>
@@ -247,10 +176,8 @@ namespace DurableLockFunctionApp
         /// <returns></returns>
         [Deterministic]
         [FunctionName("GenericLockOrchestration")]
-        public static async Task<bool> LockOrchestration([OrchestrationTrigger] IDurableOrchestrationContext context)
-        {
-            return await context.LockOrchestration(LockName);
-        }
+        public static async Task<bool> LockOrchestration([OrchestrationTrigger] IDurableOrchestrationContext context) 
+            => await context.LockOrchestration(LockName);
 
         #endregion
 
