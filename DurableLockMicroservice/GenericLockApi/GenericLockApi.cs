@@ -4,9 +4,6 @@ using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.DurableTask;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using DurableLockLibrary;
-using System.Collections.Generic;
-using System.Net;
-using System.Text.Json;
 
 namespace DurableLockFunctionApp
 {

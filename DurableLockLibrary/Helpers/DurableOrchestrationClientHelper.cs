@@ -20,13 +20,13 @@ namespace DurableLockLibrary
                                                                    int? waitForResultSeconds,
                                                                    bool genericMode)
         {
-            ////get locks input list from post data
-            List<HttpLockOperation> lockOps = new()
-            {
-                new HttpLockOperation() { LockId = "a1", LockType = lockType },
-                new HttpLockOperation() { LockId = "a2", LockType = lockType, StayLocked = true },
-                new HttpLockOperation() { LockId = "a3", LockType = lockType }
-            };
+            //    ////get locks input list from post data
+            //List<HttpLockOperation> lockOps = new();
+        //    {
+        //        new HttpLockOperation() { LockId = "a1", LockType = lockType },
+        //        new HttpLockOperation() { LockId = "a2", LockType = lockType, StayLocked = true },
+        //        new HttpLockOperation() { LockId = "a3", LockType = lockType }
+        //    };
 
             string content = await req.Content.ReadAsStringAsync();
 
@@ -47,7 +47,7 @@ namespace DurableLockLibrary
             /////////////////////////////// reads //////////////////////////////////
             // 1st just do quick reads on all locks, no need to try do lock orchestrations if a read returns locked 423, exit
 
-            //List<HttpLockOperation> lockOps = JsonSerializer.Deserialize<List<HttpLockOperation>>(content);
+            List<HttpLockOperation> lockOps = JsonSerializer.Deserialize<List<HttpLockOperation>>(content);
 
             List<Task<HttpResponseMessage>> readTasks = new();
 
