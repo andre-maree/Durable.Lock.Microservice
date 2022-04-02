@@ -54,13 +54,17 @@ namespace DurableLockLibrary
             {
                 string result = await orchResponse.Content.ReadAsStringAsync();
 
+                // lock success
                 if (result.Equals("true", StringComparison.OrdinalIgnoreCase))
                 {
-                    respsone = new(HttpStatusCode.OK);
+                    respsone = new(HttpStatusCode.Created)
+                    {
+                        Content = new StringContent($"http://{Environment.GetEnvironmentVariable("WEBSITE_HOSTNAME")}/unlock/{lockType}/{lockId}")
+                    };
                 }
-                else
+                else // lock conflict for lock or OK for successful unlock
                 {
-                    respsone = opName.Equals("lock") ? new(HttpStatusCode.Locked) : new(HttpStatusCode.OK);
+                    respsone = opName.Equals("lock") ? new(HttpStatusCode.Conflict) : new(HttpStatusCode.OK);
                 }
             }
             else if (orchResponse.StatusCode == HttpStatusCode.Accepted)
