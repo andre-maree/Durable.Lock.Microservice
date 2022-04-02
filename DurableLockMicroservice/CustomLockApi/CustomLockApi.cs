@@ -11,7 +11,7 @@ namespace DurableLockFunctionApp
     /// This class can be used to quickly create your own type of lock.
     /// Just copy this class and change the LockType value to create a new type of lock.
     /// </summary>
-    public static class CustomLockApi1
+    public static class CustomLockApi
     {
         // This value is all that needs to change to create your own new lock type
         const string LockType = "Custom1";

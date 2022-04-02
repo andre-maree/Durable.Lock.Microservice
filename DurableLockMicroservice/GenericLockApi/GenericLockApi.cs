@@ -35,8 +35,14 @@ namespace DurableLockFunctionApp
                                                                   [DurableClient] IDurableClient client,
                                                                   string lockType,
                                                                   string lockId,
-                                                                  int? waitForResultSeconds) 
-            => await client.ExcecuteLock(req, "GenericLockOrchestration", LockName, lockType, lockId, waitForResultSeconds, true);
+                                                                  int? waitForResultSeconds)
+            => await client.ExcecuteLock(req,
+                                         "GenericLockOrchestration",
+                                         LockName,
+                                         lockType,
+                                         lockId,
+                                         waitForResultSeconds,
+                                         true);
 
 
 
@@ -72,75 +78,6 @@ namespace DurableLockFunctionApp
                                                                string lockId)
             => await client.ReadDurableLock(LockName, $"{lockType}@{lockId}");
 
-        /// <summary>
-        /// This is used to read locks with DurableEntityClient
-        /// </summary>
-        /// <returns></returns>
-        [FunctionName("ReadLocks")]
-        public static async Task<HttpResponseMessage> ReadLocks([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "ReadLocks/{RespondWhen1stLockFound}")] HttpRequestMessage req,
-                                                               [DurableClient] IDurableEntityClient client,
-                                                               bool RespondWhen1stLockFound)
-        {
-            string content = await req.Content.ReadAsStringAsync();
-
-            List<HttpLockOperation> lockOps = JsonSerializer.Deserialize<List<HttpLockOperation>>(content);
-
-            List<Task<HttpLockOperation>> readTasks = new();
-
-            foreach (HttpLockOperation lockOp in lockOps)
-            {
-                readTasks.Add(client.ExecuteRead(LockName, lockOp));
-            }
-
-            int readCount = 0;
-
-            if (RespondWhen1stLockFound)
-            {
-                while (readCount < readTasks.Count)
-                {
-                    Task<HttpLockOperation> readTask = await Task.WhenAny<HttpLockOperation>(readTasks);
-
-                    // if any read says locked then bail out
-                    if (readTask.Result.HttpLockResponse.StatusCode != HttpStatusCode.OK)
-                    {
-                        return new HttpResponseMessage(readTask.Result.HttpLockResponse.StatusCode)
-                        {
-                            Content = new StringContent(JsonSerializer.Serialize(new LockOperation() { LockType = readTask.Result.LockType, LockId = readTask.Result.LockId }))
-                        };
-                    }
-
-                    readCount++;
-                }
-            }
-
-            List<LockOperation> output = new List<LockOperation>();
-            bool isLocked = false;
-
-            while (readCount < readTasks.Count)
-            {
-                Task<HttpLockOperation> readTask = await Task.WhenAny<HttpLockOperation>(readTasks);
-
-                // read all
-                if (readTask.Result.HttpLockResponse.StatusCode != HttpStatusCode.OK)
-                {
-                    isLocked = true;
-
-                    output.Add(new LockOperation() { LockType = readTask.Result.LockType, LockId = readTask.Result.LockId });
-                }
-
-                readCount++;
-            }
-
-            if (!isLocked)
-            {
-                return new HttpResponseMessage(HttpStatusCode.OK);
-            }
-
-            return new HttpResponseMessage(HttpStatusCode.Locked)
-            {
-                Content = new StringContent(JsonSerializer.Serialize(output))
-            };
-        }
 
 
         /// <summary>
@@ -176,7 +113,7 @@ namespace DurableLockFunctionApp
         /// <returns></returns>
         [Deterministic]
         [FunctionName("GenericLockOrchestration")]
-        public static async Task<bool> LockOrchestration([OrchestrationTrigger] IDurableOrchestrationContext context) 
+        public static async Task<bool> LockOrchestration([OrchestrationTrigger] IDurableOrchestrationContext context)
             => await context.LockOrchestration(LockName);
 
         #endregion
