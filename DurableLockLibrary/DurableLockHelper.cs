@@ -9,14 +9,6 @@ namespace DurableLockLibrary
     /// </summary>
     public static class DurableLockHelper
     {
-        #region Constants
-
-        public const string Lock = "lock";
-        public const string UnLock = "unlock";
-        public const string DeleteLock = "deletelock";
-
-        #endregion
-
         #region DurableClient helpers
 
         /// <summary>
@@ -54,13 +46,17 @@ namespace DurableLockLibrary
             {
                 string result = await orchResponse.Content.ReadAsStringAsync();
 
+                // lock success
                 if (result.Equals("true", StringComparison.OrdinalIgnoreCase))
                 {
-                    respsone = new(HttpStatusCode.OK);
+                    respsone = new(HttpStatusCode.Created)
+                    {
+                        Content = new StringContent($"http://{Environment.GetEnvironmentVariable("WEBSITE_HOSTNAME")}/unlock/{lockType}/{lockId}")
+                    };
                 }
-                else
+                else // lock conflict for lock or OK for successful unlock
                 {
-                    respsone = opName.Equals("lock") ? new(HttpStatusCode.Locked) : new(HttpStatusCode.OK);
+                    respsone = opName.Equals("lock") ? new(HttpStatusCode.Conflict) : new(HttpStatusCode.OK);
                 }
             }
             else if (orchResponse.StatusCode == HttpStatusCode.Accepted)
@@ -85,11 +81,11 @@ namespace DurableLockLibrary
         /// <param name="lockType">This string value is the name of the type of lock</param>
         /// <param name="lockId">This string value is the key for the lock type</param>
         /// <returns>200</returns>
-        public static async Task<HttpResponseMessage> DeleteDurableLock(this IDurableClient client, string lockName,  string lockType, string lockId)
+        public static async Task<HttpResponseMessage> DeleteDurableLock(this IDurableClient client, string lockName, string lockType, string lockId)
         {
             EntityId entityId = new(lockName, $"{lockType}@{lockId}");
 
-            await client.SignalEntityAsync(entityId, DurableLockHelper.DeleteLock);
+            await client.SignalEntityAsync(entityId, Constants.DeleteLock);
 
             return new(HttpStatusCode.OK);
         }
@@ -155,10 +151,18 @@ namespace DurableLockLibrary
 
             EntityStateResponse<bool> IsLocked = await client.ReadEntityStateAsync<bool>(entId);
 
-            HttpResponseMessage respsone = new(HttpStatusCode.OK)
+            HttpResponseMessage respsone;
+
+            if (IsLocked.EntityState)
             {
-                Content = new StringContent(IsLocked.EntityState.ToString())
-            };
+                respsone = new HttpResponseMessage(HttpStatusCode.Locked);
+            }
+            else
+            {
+                respsone = new HttpResponseMessage(HttpStatusCode.OK);
+            }
+
+            respsone.Content = new StringContent(IsLocked.EntityState.ToString());
 
             return respsone;
         }
@@ -175,7 +179,7 @@ namespace DurableLockLibrary
         {
             switch (ctx.OperationName)
             {
-                case Lock:
+                case Constants.Lock:
                     {
                         bool isLocked = ctx.GetState<bool>();
 
@@ -189,7 +193,7 @@ namespace DurableLockLibrary
                         break;
                     }
 
-                case UnLock:
+                case Constants.UnLock:
                     {
                         ctx.SetState(false);
 
@@ -198,7 +202,7 @@ namespace DurableLockLibrary
                         break;
                     }
 
-                case DeleteLock:
+                case Constants.DeleteLock:
                     {
                         ctx.DeleteState();
 
