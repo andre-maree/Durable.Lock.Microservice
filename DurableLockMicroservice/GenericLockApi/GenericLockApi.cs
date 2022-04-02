@@ -148,7 +148,7 @@ namespace DurableLockFunctionApp
             if (lastLock.HttpLockResponse.StatusCode == HttpStatusCode.Created)
             {
                 // unlock the non-permanent locks only
-                foreach (HttpLockOperation lockOp in lockedLi.FindAll(l => !l.PermanentLock))
+                foreach (HttpLockOperation lockOp in lockedLi.FindAll(l => !l.StayLocked))
                 {
                     unlockResponses.Add(ExecuteLock(req, client, waitForResultSeconds, lockOp, Constants.UnLock));
                 }
