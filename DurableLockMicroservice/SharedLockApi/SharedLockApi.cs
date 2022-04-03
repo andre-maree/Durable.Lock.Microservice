@@ -17,12 +17,12 @@ namespace DurableLockApi.SharedLockApi
         /// Get all locks
         /// </summary>
         /// <returns></returns>
-        [FunctionName("GetLocks")]
-        public static async Task<HttpResponseMessage> GetLocks([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "GetLocks/{Generic?}/{LockType?}")] HttpRequestMessage req,
-                                                               [DurableClient] IDurableClient client,
-                                                               string generic,
-                                                               string lockType)
-            => await client.GetDurableLocks(generic, lockType);
+        //[FunctionName("GetLocks")]
+        //public static async Task<HttpResponseMessage> GetLocks([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "GetLocks/{Generic?}/{LockType?}")] HttpRequestMessage req,
+        //                                                       [DurableClient] IDurableEntityClient client,
+        //                                                       string generic,
+        //                                                       string lockType)
+        //    => await client.GetDurableLocks(generic, lockType);
 
         /// <summary>
         /// This is used to read locks with DurableEntityClient

@@ -15,24 +15,26 @@ namespace LockTest
         [TestMethod]
         public async Task TestMethod1()
         {
+            await HttpClient.GetAsync("http://localhost:7071/clean");
+
             string lockType = "project";
 
             ////get locks input list from post data
-            List<HttpLockOperation> lockOps = new()
+            List<LockOperation> lockOps = new()
             {
-                new HttpLockOperation() { LockId = "a1", LockType = lockType },
-                new HttpLockOperation() { LockId = "a2", LockType = lockType, StayLocked = true },
-                new HttpLockOperation() { LockId = "a3", LockType = lockType }
+                new LockOperation() { LockId = "a1", LockType = lockType },
+                new LockOperation() { LockId = "a2", LockType = lockType, StayLocked = true },
+                new LockOperation() { LockId = "a3", LockType = lockType }
             };
 
-            var res = await HttpClient.PostAsJsonAsync("http://localhost:7071/Lock/project/5/55", lockOps);
+            var res = await HttpClient.PostAsJsonAsync("http://localhost:7071/Lock2/15", lockOps);
+            var rese = await res.Content.ReadAsStringAsync();
+            //List<string> result = JsonSerializer.Deserialize<List<string>>(await res.Content.ReadAsStringAsync());
 
-            List<string> result = JsonSerializer.Deserialize<List<string>>(await res.Content.ReadAsStringAsync());
-
-            foreach(var loc in result)
-            {
-                res = await HttpClient.GetAsync(loc);
-            }
+            //foreach(var loc in result)
+            //{
+            //    res = await HttpClient.GetAsync(loc);
+            //}
         }
     }
 }

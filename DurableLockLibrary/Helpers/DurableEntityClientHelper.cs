@@ -12,7 +12,7 @@ namespace DurableLockLibrary
 
         public static async Task<HttpLockOperation> ExecuteRead(this IDurableEntityClient client, string lockName, HttpLockOperation lockOp)
         {
-            lockOp.HttpLockResponse = await client.ReadDurableLock(lockName, $"{lockOp.LockType}@{lockOp.LockId}");
+            lockOp.HttpLockResponse = await ReadDurableLock(client, lockName, $"{lockOp.LockType}@{lockOp.LockId}");
 
             return lockOp;
         }
@@ -24,7 +24,7 @@ namespace DurableLockLibrary
         /// <param name="lockType">This string value is the name of the type of lock</param>
         /// <param name="lockId">This string value is the key for the lock type</param>
         /// <returns>200 and true for locked and false for unlocked</returns>
-        public static async Task<HttpResponseMessage> ReadDurableLock(this IDurableEntityClient client, string entityId, string entityKey)
+        public static async Task<HttpResponseMessage> ReadDurableLock(IDurableEntityClient client, string entityId, string entityKey)
         {
             EntityId entId = new(entityId, entityKey);
 

@@ -15,13 +15,17 @@ namespace DurableLockLibrary
         /// <param name="context">DurableOrchestrationContext</param>
         /// <param name="lockType">This string value is the name of the type of lock</param>
         /// <returns>True for locked and false for unlocked</returns>
-        public static async Task<bool> LockOrchestration(this IDurableOrchestrationContext context, string lockType)
+        public static async Task<LockOperation> LockOrchestration(this IDurableOrchestrationContext context, string lockType)
         {
             string operartionName = context.GetInput<string>();
 
             EntityId entityId = new(lockType, context.InstanceId);
 
-            return await context.CallEntityAsync<bool>(entityId, operartionName);
+            var isLocked = await context.CallEntityAsync<bool>(entityId, operartionName);
+
+            var inst = context.InstanceId.Split('@');
+
+            return new LockOperation() { LockId = inst[1], LockType = inst[0], StayLocked = isLocked };
         }
 
         #endregion
