@@ -20,7 +20,7 @@ namespace DurableLockFunctionApp
     {
         #region Constants: LockName can be modified to a another name
 
-    const string LockName = "GenericLock";
+        const string LockName = "GenericLock";
 
         #endregion
 
@@ -47,19 +47,10 @@ namespace DurableLockFunctionApp
         {
             try
             {
-                var createdTimeFrom = DateTime.UtcNow.Subtract(TimeSpan.FromDays(365 + 30));
-                var createdTimeTo = createdTimeFrom.AddDays(30);
-                var runtimeStatus = new List<OrchestrationStatus>
-    {
-        OrchestrationStatus.Running,OrchestrationStatus.Completed,OrchestrationStatus.Pending,OrchestrationStatus.Failed,OrchestrationStatus.Canceled
-    };
-                var result = await client.PurgeInstanceHistoryAsync(createdTimeFrom, createdTimeTo, runtimeStatus);
-
-
                 var sr = await req.Content.ReadAsStringAsync();
                 List<LockOperation> lockOps = JsonSerializer.Deserialize<List<LockOperation>>(sr);
                 var guid = Guid.NewGuid().ToString();
-                var rr=await client.StartNewAsync("MainLockOrchestration", guid, lockOps);
+                var rr = await client.StartNewAsync("MainLockOrchestration", guid, lockOps);
 
                 return await client.WaitForCompletionOrCreateCheckStatusResponseAsync(req,
                                                                                    guid,
@@ -75,74 +66,154 @@ namespace DurableLockFunctionApp
                 var r = 0;
                 return new HttpResponseMessage(HttpStatusCode.InternalServerError);
             }
-            //return await client.ExcecuteLock(req,
-            //                                        "GenericLockOrchestration",
-            //                                        LockName,
-            //                                        lockType,
-            //                                        lockId,
-            //                                        waitForResultSeconds,
-            //                                        true);
         }
 
-        
+
         /// <summary>
         /// Lock orchestration with DurableOrchestrationContext
         /// </summary>
         /// <returns></returns>
         [Deterministic]
         [FunctionName("MainLockOrchestration")]
-        public static async Task<List<string>> MainLockOrchsestration([OrchestrationTrigger] IDurableOrchestrationContext context)
+        public static async Task<LockResult> MainLockOrchsestration([OrchestrationTrigger] IDurableOrchestrationContext context)
         {
-            List<string> result = new();
+            List<string> lockList = new();
             try
             {
-                var lockOps = context.GetInput<List<HttpLockOperation>>();
+                var lockOps = context.GetInput<List<LockOperation>>();
 
-                List<Task<LockOperation>> lockResponses = new();
+                List<Task<LockOperationResult>> lockResponses = new();
                 List<Task> unlockResponses = new();
-                List<HttpLockOperation> lockedLi = new();
+                List<LockOperation> lockedLi = new();
+                List<LockOperation> successLi = new();
 
-                foreach (HttpLockOperation lockOp in lockOps)
+                foreach (LockOperation lockOp in lockOps)
                 {
                     // call sub orch
-                    lockResponses.Add(context.CallSubOrchestratorAsync<LockOperation>("GenericLockOrchestration2", $"{lockOp.LockType}@{lockOp.LockId}", "lock"));
+                    lockResponses.Add(context.CallSubOrchestratorAsync<LockOperationResult>("GenericLockOrchestration2", $"{lockOp.LockType}@{lockOp.LockId}", "lock"));
                     //lockResponses.Add(client.ExecuteLock(req, orchestratioName, waitForResultSeconds, lockOp, Constants.Lock, genericMode));
                 }
 
                 await Task.WhenAll(lockResponses);
 
-                List<Task<LockOperation>> successLocks = lockResponses.FindAll(r => r.Result.StayLocked == true);
+                //List<Task<LockOperation>> successLocks = lockResponses.FindAll(r => r.Result.StayLocked == true);
 
-                if (successLocks.Count != lockOps.Count)
+                //if (successLocks.Count != lockOps.Count)
+                //{
+                var lockedItems = new List<string>();
+                List<Task<LockOperationResult>> list = lockResponses;
+
+                foreach (Task<LockOperationResult> lockOp in list)
                 {
-                    foreach (var lockOp in lockResponses.FindAll(l => l.Result.StayLocked))
+                    if (lockOp.Result.IsLocked)
                     {
-                        unlockResponses.Add(context.CallSubOrchestratorAsync<LockOperation>("GenericLockOrchestration2", $"{lockOp.Result.LockType}@{lockOp.Result.LockId}", "unlock"));
+                        successLi.Add(lockOp.Result);
+                    }
+                    else
+                    {
+                        lockOp.Result.IsLocked = true;
+                        lockedLi.Add(lockOp.Result);
+                    }
+                }
+
+                //await Task.WhenAll(unlockResponses);
+
+                // conflicts
+                if (lockedLi.Count > 0)
+                {
+                    foreach (var lockOp in successLi)
+                    {
+                        unlockResponses.Add(context.CallSubOrchestratorAsync<LockOperation>("GenericLockOrchestration2", $"{lockOp.LockType}@{lockOp.LockId}", "unlock"));
                     }
 
                     await Task.WhenAll(unlockResponses);
 
-                    // conflicts
-                    return result;
+                    return new LockResult()
+                    {
+                        HttpStatusCode = 429,
+                        Locks = lockedLi
+                    };
                 }
 
-                foreach (var lockOp in lockOps.FindAll(l => !l.StayLocked))
-                {
-                    unlockResponses.Add(context.CallSubOrchestratorAsync<LockOperation>("GenericLockOrchestration2", $"{lockOp.LockType}@{lockOp.LockId}", "unlock"));
-                }
 
-                await Task.WhenAll(unlockResponses);
+                //foreach (var lockOp in lockOps.FindAll(l => !l.StayLocked))
+                //{
+                //    unlockResponses.Add(context.CallSubOrchestratorAsync<LockOperation>("GenericLockOrchestration2", $"{lockOp.LockType}@{lockOp.LockId}", "unlock"));
+                //    successLi.Remove(LockName + "/" + lockOp.LockType + "/" + lockOp.LockId);
+                //}
 
-                foreach(var lockOp in successLocks)
-                {
-                    result.Add(lockOp.Result.LockType + "/" + lockOp.Result.LockId);
-                }
-                return result;
+                //await Task.WhenAll(unlockResponses);
+
+                //foreach (var lockOp in successLocks)
+                //{
+                //    lockList.Add(LockName + "/" + lockOp.Result.LockType + "/" + lockOp.Result.LockId);
+                //}
+
+                return new LockResult() { HttpStatusCode = 201, Locks = successLi };
             }
             catch (Exception ex)
             {
                 var r = 0;
-                return result;
+                return new LockResult() { HttpStatusCode = 500 };
+            }
+        }
+
+        [FunctionName("UnLock2")]
+        public static async Task<HttpResponseMessage> UnLock2([HttpTrigger(AuthorizationLevel.Anonymous, "get", "post", Route = "UnLock2/{waitForResultSeconds:int?}")] HttpRequestMessage req,
+                                                                  [DurableClient] IDurableOrchestrationClient client,
+                                                                  int? waitForResultSeconds)
+        {
+            try
+            {
+                var sr = await req.Content.ReadAsStringAsync();
+                List<LockOperation> lockOps = JsonSerializer.Deserialize<List<LockOperation>>(sr);
+                var guid = Guid.NewGuid().ToString();
+                var rr = await client.StartNewAsync("UnLock2Orchestration", guid, lockOps);
+
+                return await client.WaitForCompletionOrCreateCheckStatusResponseAsync(req,
+                                                                                   guid,
+                                                                                   TimeSpan.FromSeconds(waitForResultSeconds is null
+                                                                                   ? 5
+                                                                                   : waitForResultSeconds.Value));
+
+
+
+            }
+            catch (Exception ex)
+            {
+                var r = 0;
+                return new HttpResponseMessage(HttpStatusCode.InternalServerError);
+            }
+        }
+        /// <summary>
+        /// Lock orchestration with DurableOrchestrationContext
+        /// </summary>
+        /// <returns></returns>
+        [Deterministic]
+        [FunctionName("UnLock2Orchestration")]
+        public static async Task<LockResult> UnLockOrchestration([OrchestrationTrigger] IDurableOrchestrationContext context)
+        {
+            try
+            {
+                var lockOps = context.GetInput<List<LockOperation>>();
+
+                List<Task> unlockResponses = new();
+                
+
+                foreach (LockOperation lockOp in lockOps)
+                {
+                    // call sub orch
+                    unlockResponses.Add(context.CallSubOrchestratorAsync<LockOperationResult>("GenericLockOrchestration2", $"{lockOp.LockType}@{lockOp.LockId}", "unlock"));
+                }
+
+                await Task.WhenAll(unlockResponses);
+
+                return new LockResult() { HttpStatusCode = 200 };
+            }
+            catch (Exception ex)
+            {
+                var r = 0;
+                return new LockResult() { HttpStatusCode = 500 };
             }
         }
 

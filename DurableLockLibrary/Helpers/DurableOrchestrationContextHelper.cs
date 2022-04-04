@@ -25,7 +25,7 @@ namespace DurableLockLibrary
 
             var inst = context.InstanceId.Split('@');
 
-            return new LockOperation() { LockId = inst[1], LockType = inst[0], StayLocked = isLocked };
+            return new LockOperationResult() { LockId = inst[1], LockType = inst[0], IsLocked = isLocked };
         }
 
         #endregion

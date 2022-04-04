@@ -4,11 +4,17 @@
     {
         public string LockType { get; set; }
         public string LockId { get; set; }
-        public bool StayLocked { get; set; }
+        //public bool StayLocked { get; set; }
     }
 
-    public class HttpLockOperation : LockOperation
+    public class LockOperationResult : LockOperation
     {
-        public HttpResponseMessage HttpLockResponse { get; set; }
+        public bool IsLocked { get; set; }
+    }
+
+    public class LockResult
+    {
+        public int HttpStatusCode { get; set; }
+        public List<LockOperation> Locks { get; set; }
     }
 }

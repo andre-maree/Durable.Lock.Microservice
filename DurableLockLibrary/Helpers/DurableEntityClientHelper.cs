@@ -10,9 +10,9 @@ namespace DurableLockLibrary
     {
         #region DurableEntityClient helpers
 
-        public static async Task<HttpLockOperation> ExecuteRead(this IDurableEntityClient client, string lockName, HttpLockOperation lockOp)
+        public static async Task<LockOperation> ExecuteRead(this IDurableEntityClient client, string lockName, LockOperation lockOp)
         {
-            lockOp.HttpLockResponse = await ReadDurableLock(client, lockName, $"{lockOp.LockType}@{lockOp.LockId}");
+            var httpLockResponse = await ReadDurableLock(client, lockName, $"{lockOp.LockType}@{lockOp.LockId}");
 
             return lockOp;
         }

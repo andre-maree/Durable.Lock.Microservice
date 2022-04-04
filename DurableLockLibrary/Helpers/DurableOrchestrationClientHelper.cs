@@ -150,21 +150,21 @@ namespace DurableLockLibrary
         //    };
         //}
 
-        public static async Task<HttpLockOperation> ExecuteLock(this IDurableOrchestrationClient client,
+        public static async Task<LockOperation> ExecuteLock(this IDurableOrchestrationClient client,
                                                                 HttpRequestMessage req,
                                                                 string orchestratioName,
                                                                 int? waitForResultSeconds,
-                                                                HttpLockOperation lockOp,
+                                                                LockOperation lockOp,
                                                                 string lockOperstion,
                                                                 bool genericMode)
         {
-            lockOp.HttpLockResponse = await client.DurableLockOrchestrationStart(req,
-                                                               orchestratioName,
-                                                               lockOp.LockType,
-                                                               lockOp.LockId,
-                                                               waitForResultSeconds,
-                                                               lockOperstion,
-                                                               genericMode);
+            //lockOp.HttpLockResponse = await client.DurableLockOrchestrationStart(req,
+            //                                                   orchestratioName,
+            //                                                   lockOp.LockType,
+            //                                                   lockOp.LockId,
+            //                                                   waitForResultSeconds,
+            //                                                   lockOperstion,
+            //                                                   genericMode);
 
             return lockOp;
         }
