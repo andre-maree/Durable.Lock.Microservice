@@ -15,7 +15,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\DurableLockLibrary\DurableLockLibrary.csproj" />
+    <ProjectReference Include="..\DurableLockLibrary\DurableLockModels.csproj" />
   </ItemGroup>
 
 </Project>

@@ -5,9 +5,9 @@ VisualStudioVersion = 17.1.32319.34
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DurableLockApi", "DurableLockMicroservice\DurableLockApi.csproj", "{30E3C906-E5D7-407A-94CC-5AD6B2767681}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DurableLockLibrary", "DurableLockLibrary\DurableLockLibrary.csproj", "{E7C62FD8-CC3B-4AF2-854B-57C69D4DDC85}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DurableLockModels", "DurableLockLibrary\DurableLockModels.csproj", "{E7C62FD8-CC3B-4AF2-854B-57C69D4DDC85}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LockTest", "LockTest\LockTest.csproj", "{DD5F7647-F323-41E8-966E-701C036EC67B}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "LockTest", "LockTest\LockTest.csproj", "{DD5F7647-F323-41E8-966E-701C036EC67B}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
