@@ -1,8 +1,8 @@
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.DurableTask;
-using DurableLockModels;
+using Durable.Lock.Models;
 
-namespace DurableLockApi
+namespace Durable.Lock.Api
 {
     /// <summary>
     /// This class can be used to quickly create your own type of lock.

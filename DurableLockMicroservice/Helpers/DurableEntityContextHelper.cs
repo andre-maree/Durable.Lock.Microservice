@@ -1,7 +1,7 @@
-﻿using DurableLockModels;
+﻿using Durable.Lock.Models;
 using Microsoft.Azure.WebJobs.Extensions.DurableTask;
 
-namespace DurableLockApi
+namespace Durable.Lock.Api
 {
     /// <summary>
     /// Generic Durable Lock functionality

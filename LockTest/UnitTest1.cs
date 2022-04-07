@@ -1,5 +1,6 @@
-using DurableLockModels;
+using Durable.Lock.Models;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Text.Json;
@@ -17,42 +18,51 @@ namespace LockTest
         {
             try
             {
-                for (int i = 0; i < 20; i++)
+                for (int i = 0; i < 2; i++)
                 {
                     await TestConcurrency().ConfigureAwait(false);
-                    //await TestAll();
+                    await TestAll().ConfigureAwait(false);
                 }
 
                 Assert.IsTrue(true);
             }
-            catch (System.Exception d)
+            catch (Exception)
             {
-                var r = 0;
+                throw;
             }
         }
 
         [TestMethod]
         public async Task TestConcurrency()
         {
-            //LockOperationResult successLock;
-            //LockOperationResult failLockLock;
-
             try
             {
                 string lockType = "project";
                 string lockName = "GenericLock";
 
-                ////get locks input list from post data
+                //get locks input list from post data
                 List<LockOperation> lockOps = new()
                 {
-                    new LockOperation() { LockId = "a1", LockType = lockType, User = "user1", LockName = lockName }//,
-                                                                                                                   //new LockOperation() { LockId = "a1", LockType = lockType, User = "user1", LockName = lockName }
+                    new LockOperation() { LockId = "a1", LockType = lockType, User = "user1", LockName = lockName }
                 };
 
                 HttpResponseMessage del1 = await HttpClient.GetAsync($"http://localhost:7071/DeleteLock/{lockName}/{lockType}/a1").ConfigureAwait(false);
 
-                Assert.IsTrue(del1.StatusCode == System.Net.HttpStatusCode.OK);
+                
+                if (del1.StatusCode==System.Net.HttpStatusCode.Accepted)
+                {
+                    while (true)
+                    {
+                        HttpResponseMessage readres = await HttpClient.GetAsync($"http://localhost:7071/ReadLock/{lockName}/{lockType}/a1").ConfigureAwait(false);
+                        var read = JsonSerializer.Deserialize<LockOperationResult>(await readres.Content.ReadAsStringAsync().ConfigureAwait(false));
 
+                        if(read?.User is null)
+                        {
+                            break;
+                        }
+                    }
+                }
+                
                 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
                 var resLocks2 = HttpClient.PostAsJsonAsync("http://localhost:7071/Lock/1000", lockOps);
                 var resLocks3 = HttpClient.PostAsJsonAsync("http://localhost:7071/Lock/1000", lockOps);
@@ -62,25 +72,11 @@ namespace LockTest
                 LockResultResponse result2 = JsonSerializer.Deserialize<LockResultResponse>(await resLocks3.Result.Content.ReadAsStringAsync().ConfigureAwait(false));
 
                 Assert.IsTrue((result.HttpStatusCode == 201 && result2.HttpStatusCode == 409) || (result.HttpStatusCode == 409 && result2.HttpStatusCode == 201));
-
-                // successLock = result.Locks.Find(s => s.IsLocked && !s.Confilcted)==?;
-                // failLockLock = result2.Locks.Find(s => s.IsLocked && s.Confilcted && !s.Equals(successLock));
-
-                //if(successLock==null || failLockLock==null)
-                //{
-                //    Assert.IsTrue(false);
-                //}
-                //Assert.IsNotNull(successLock);
-                //Assert.IsNotNull(failLockLock);
             }
-            catch (System.Exception d)
+            catch (Exception)
             {
-                var r = 0;
+                throw;
             }
-
-            //LockResultResponse result = JsonSerializer.Deserialize<LockResultResponse>(await resLocks.Content.ReadAsStringAsync());
-
-            //Assert.IsTrue(resLocks.StatusCode == System.Net.HttpStatusCode.InternalServerError);
         }
 
         [TestMethod]
@@ -103,15 +99,23 @@ namespace LockTest
                 HttpResponseMessage del2 = await HttpClient.GetAsync($"http://localhost:7071/DeleteLock/{lockName}/{lockType}/a2").ConfigureAwait(false);
                 HttpResponseMessage del3 = await HttpClient.GetAsync($"http://localhost:7071/DeleteLock/{lockName}/{lockType}/a3").ConfigureAwait(false);
 
-                Assert.IsTrue(del1.StatusCode == System.Net.HttpStatusCode.OK);
-                Assert.IsTrue(del2.StatusCode == System.Net.HttpStatusCode.OK);
-                Assert.IsTrue(del3.StatusCode == System.Net.HttpStatusCode.OK);
+                Assert.IsTrue(del1.StatusCode == System.Net.HttpStatusCode.OK || del1.StatusCode == System.Net.HttpStatusCode.Accepted);
+                Assert.IsTrue(del2.StatusCode == System.Net.HttpStatusCode.OK || del2.StatusCode == System.Net.HttpStatusCode.Accepted);
+                Assert.IsTrue(del3.StatusCode == System.Net.HttpStatusCode.OK || del3.StatusCode == System.Net.HttpStatusCode.Accepted);
 
 
                 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
                 HttpResponseMessage readres = await HttpClient.PostAsJsonAsync("http://localhost:7071/ReadLocks", lockOps).ConfigureAwait(false);
                 var reads = JsonSerializer.Deserialize<List<LockOperationResult>>(await readres.Content.ReadAsStringAsync().ConfigureAwait(false));
 
+                while(reads.FindAll(l => l.User == null).Count < 3)
+                {
+                    readres = await HttpClient.PostAsJsonAsync("http://localhost:7071/ReadLocks", lockOps).ConfigureAwait(false);
+                    reads = JsonSerializer.Deserialize<List<LockOperationResult>>(await readres.Content.ReadAsStringAsync().ConfigureAwait(false));
+
+                    await Task.Delay(1000);
+                }
+                
                 Assert.IsTrue(reads.FindAll(l => l.User == null).Count == 3);
 
 
@@ -197,13 +201,13 @@ namespace LockTest
                 del2 = await HttpClient.GetAsync($"http://localhost:7071/DeleteLock/{lockName}/{lockType}/a2").ConfigureAwait(false);
                 del3 = await HttpClient.GetAsync($"http://localhost:7071/DeleteLock/{lockName}/{lockType}/a3").ConfigureAwait(false);
 
-                Assert.IsTrue(del1.StatusCode == System.Net.HttpStatusCode.OK);
-                Assert.IsTrue(del2.StatusCode == System.Net.HttpStatusCode.OK);
-                Assert.IsTrue(del3.StatusCode == System.Net.HttpStatusCode.OK);
+                Assert.IsTrue(del1.StatusCode == System.Net.HttpStatusCode.OK || del1.StatusCode == System.Net.HttpStatusCode.Accepted);
+                Assert.IsTrue(del2.StatusCode == System.Net.HttpStatusCode.OK || del2.StatusCode == System.Net.HttpStatusCode.Accepted);
+                Assert.IsTrue(del3.StatusCode == System.Net.HttpStatusCode.OK || del3.StatusCode == System.Net.HttpStatusCode.Accepted);
             }
-            catch (System.Exception d)
+            catch (Exception )
             {
-                var r = 0;
+                throw;
             }
         }
     }

@@ -2,7 +2,7 @@
 using System.Net;
 using System.Text.Json;
 
-namespace DurableLockApi
+namespace Durable.Lock.Api
 {
     /// <summary>
     /// Generic Durable Lock functionality

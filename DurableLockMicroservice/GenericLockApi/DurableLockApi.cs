@@ -1,15 +1,15 @@
-using System.Net.Http;
-using System.Threading.Tasks;
+using Durable.Lock.Models;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.DurableTask;
 using Microsoft.Azure.WebJobs.Extensions.Http;
-using DurableLockModels;
-using System.Collections.Generic;
 using System;
+using System.Collections.Generic;
 using System.Net;
+using System.Net.Http;
 using System.Text.Json;
+using System.Threading.Tasks;
 
-namespace DurableLockApi
+namespace Durable.Lock.Api
 {
     /// <summary>
     /// This class is gereric to handle any locks defined
@@ -161,6 +161,13 @@ namespace DurableLockApi
             EntityId entityId = new(lockName, $"{lockType}@{lockId}");
 
             await client.SignalEntityAsync(entityId, Constants.DeleteLock);
+
+            EntityStateResponse<LockState> ent = await client.ReadEntityStateAsync<LockState>(entityId);
+
+            if (ent.EntityExists)
+            {
+                return new(HttpStatusCode.Accepted);
+            }
 
             return new(HttpStatusCode.OK);
         }

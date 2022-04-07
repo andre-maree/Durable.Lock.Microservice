@@ -1,4 +1,4 @@
-﻿namespace DurableLockModels
+﻿namespace Durable.Lock.Models
 {
     public class LockBase
     {
