@@ -1,3 +1,5 @@
+### The end of all locking code has arrived:
+
 #### The elusive distributed lock is now a simple implementation thanks to Durable.Lock.Microservice. This micro-service Api Durable Function lock implementation is simple to use but powerful and contains all the basic functinality that you need. Happy locking!
 
 - Re-use the DurableLockApi and DurableLockLibrary class library to quickly and easily create your own Durable Locks.
