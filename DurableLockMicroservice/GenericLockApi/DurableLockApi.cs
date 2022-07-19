@@ -12,7 +12,7 @@ using System.Threading.Tasks;
 namespace Durable.Lock.Api
 {
     /// <summary>
-    /// This class is gereric to handle any locks defined
+    /// This class is generic to handle any locks defined
     /// </summary>
     public static class DurableLockApi
     {
