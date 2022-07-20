@@ -45,7 +45,7 @@ namespace Durable.Lock.Api
                     // conflict, set results to existing lock
                     if (lockState.LockDate != lockOperationResult.LockDate)
                     {
-                        lockOperationResult.Confilcted = true;
+                        lockOperationResult.Conflicted = true;
                         lockOperationResult.LockDate = lockState.LockDate;
                         lockOperationResult.User = lockState.User;
                     }
@@ -63,7 +63,7 @@ namespace Durable.Lock.Api
                     LockId = lockOp.LockId,
                     LockName = lockOp.LockName,
                     LockType = lockOp.LockType,
-                    Confilcted = true
+                    Conflicted = true
                 };
             }
             catch (System.Exception ex)
@@ -74,7 +74,7 @@ namespace Durable.Lock.Api
                     LockId = lockOp.LockId,
                     LockName = lockOp.LockName,
                     LockType = lockOp.LockType,
-                    Confilcted = true
+                    Conflicted = true
                 };
             }
         }

@@ -23,7 +23,7 @@
         public bool IsLocked { get; set; }
         public DateTime LockDate { get; set; }
 
-        public bool Confilcted { get; set; }
+        public bool Conflicted { get; set; }
     }
 
     public class LockResultResponse

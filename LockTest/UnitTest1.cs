@@ -135,7 +135,7 @@ namespace LockTest
 
                 Assert.IsTrue(result.HttpStatusCode == 409);
                 Assert.IsTrue(result.Locks.FindAll(l => l.IsLocked == true
-                                                        && l.Confilcted == true
+                                                        && l.Conflicted == true
                                                         && (l.User.Equals("user1") || l.User.Equals("user2") || l.User.Equals("user3"))
                                                         && (l.LockId.Equals("a1") || l.LockId.Equals("a2") || l.LockId.Equals("a3"))).Count == 3);
 
@@ -153,7 +153,7 @@ namespace LockTest
 
                 Assert.IsTrue(result.HttpStatusCode == 200);
                 Assert.IsTrue(result.Locks.FindAll(l => l.IsLocked == false
-                                                        && l.Confilcted == false
+                                                        && l.Conflicted == false
                                                         && (l.User.Equals("user1") || l.User.Equals("user2") || l.User.Equals("user3"))
                                                         && (l.LockId.Equals("a1") || l.LockId.Equals("a2") || l.LockId.Equals("a3"))).Count == 3);
 
@@ -181,12 +181,12 @@ namespace LockTest
 
                 Assert.IsTrue(result.HttpStatusCode == 409);
                 Assert.IsTrue(result.Locks.FindAll(l => l.IsLocked == true
-                                                        && l.Confilcted
+                                                        && l.Conflicted
                                                         && l.User.Equals("user1")
                                                         && l.LockId.Equals("a1")).Count == 1);
 
                 Assert.IsTrue(result.Locks.FindAll(l => l.IsLocked == false
-                                                        && l.Confilcted == false
+                                                        && l.Conflicted == false
                                                         && (l.User.Equals("user2") || l.User.Equals("user3"))
                                                         && (l.LockId.Equals("a2") || l.LockId.Equals("a3"))).Count == 2);
 

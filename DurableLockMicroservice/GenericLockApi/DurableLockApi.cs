@@ -205,7 +205,7 @@ namespace Durable.Lock.Api
 
                 foreach (Task<LockOperationResult> lockOp in lockResponses)
                 {
-                    if (lockOp.Result.Confilcted)
+                    if (lockOp.Result.Conflicted)
                     {
                         conflictsLi.Add(lockOp.Result);
                     }
