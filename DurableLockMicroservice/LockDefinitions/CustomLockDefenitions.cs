@@ -10,21 +10,11 @@ namespace Durable.Lock.Api
     /// </summary>
     public static class CustomLockDefenitions
     {
-        #region Constants: lock names
-
-        const string LockName = "GenericLock";
-
-        #endregion
-
-        #region Entity functions: locks
-
         /// <summary>
-        /// Generic lock state with DurableEntityContext
+        /// Generic lock with DurableEntityContext
         /// </summary>
-        [FunctionName(LockName)]
+        [FunctionName("GenericLock")]
         public static void GenericLock([EntityTrigger] IDurableEntityContext ctx)
             => ctx.CreateLock(Constants.Lock, ctx.GetInput<LockOperationResult>());
-
-        #endregion
     }
 }

@@ -18,6 +18,12 @@
         public string LockId { get; set; }
     }
 
+    // This used only when it is needed to lock with a key, cannot be read, input to set only
+    public class LockOperationWithKey : LockOperation
+    {
+        public string Key { get; set; }
+    }
+
     public class LockOperationResult : LockOperation
     {
         public bool IsLocked { get; set; }

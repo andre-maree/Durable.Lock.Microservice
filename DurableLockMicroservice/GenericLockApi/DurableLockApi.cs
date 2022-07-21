@@ -32,10 +32,10 @@ namespace Durable.Lock.Api
             try
             {
                 string input = await req.Content.ReadAsStringAsync();
-
+                
                 string guid = Guid.NewGuid().ToString();
 
-                string rr = await client.StartNewAsync("MainLockOrchestration", guid, input);
+                await client.StartNewAsync("MainLockOrchestration", guid, input);
 
                 return await client.WaitForCompletionOrCreateCheckStatusResponseAsync(req,
                                                                                    guid,
@@ -72,7 +72,7 @@ namespace Durable.Lock.Api
 
                 string guid = Guid.NewGuid().ToString();
 
-                string rr = await client.StartNewAsync("UnLockOrchestration", guid, lockOps);
+                string result = await client.StartNewAsync("UnLockOrchestration", guid, lockOps);
 
                 return await client.WaitForCompletionOrCreateCheckStatusResponseAsync(req,
                                                                                    guid,
@@ -118,7 +118,7 @@ namespace Durable.Lock.Api
         public static async Task<HttpResponseMessage> ReadLocks([HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "ReadLocks")] HttpRequestMessage req,
                                                                [DurableClient] IDurableEntityClient client)
         {
-            string r = JsonSerializer.Serialize(new LockOperationResult());
+            string strLockOp = JsonSerializer.Serialize(new LockOperationResult());
 
             string input = await req.Content.ReadAsStringAsync();
 
@@ -199,7 +199,7 @@ namespace Durable.Lock.Api
 
                 await Task.WhenAll(lockResponses);
 
-                List<string> lockedItems = new List<string>();
+                List<string> lockedItems = new();
 
                 List<LockOperationResult> conflictsLi = new();
 
