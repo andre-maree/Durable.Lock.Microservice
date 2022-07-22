@@ -15,6 +15,6 @@ namespace Durable.Lock.Api
         /// </summary>
         [FunctionName("GenericLock")]
         public static void GenericLock([EntityTrigger] IDurableEntityContext ctx)
-            => ctx.CreateLock(Constants.Lock, ctx.GetInput<LockOperationResult>());
+            => ctx.CreateLock(ctx.GetInput<(LockOperationResult,string)>());
     }
 }

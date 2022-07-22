@@ -59,7 +59,7 @@ namespace Durable.Lock.Api
         /// <param name="waitForResultSeconds"></param>
         /// <returns></returns>
         [FunctionName("UnLock")]
-        public static async Task<HttpResponseMessage> UnLock2([HttpTrigger(AuthorizationLevel.Anonymous, "get", "post", Route = "UnLock/{waitForResultSeconds:int?}")] HttpRequestMessage req,
+        public static async Task<HttpResponseMessage> UnLock([HttpTrigger(AuthorizationLevel.Anonymous, "get", "post", Route = "UnLock/{waitForResultSeconds:int?}")] HttpRequestMessage req,
                                                                   [DurableClient] IDurableOrchestrationClient client,
                                                                   int? waitForResultSeconds)
         {
@@ -72,7 +72,7 @@ namespace Durable.Lock.Api
 
                 string guid = Guid.NewGuid().ToString();
 
-                string result = await client.StartNewAsync("UnLockOrchestration", guid, lockOps);
+                await client.StartNewAsync("UnLockOrchestration", guid, lockOps);
 
                 return await client.WaitForCompletionOrCreateCheckStatusResponseAsync(req,
                                                                                    guid,
@@ -103,7 +103,7 @@ namespace Durable.Lock.Api
         {
             LockOperationResult read = await client.ExecuteRead(new LockOperation() { LockName = lockName, LockType = lockType, LockId = lockId });
 
-            HttpResponseMessage resp = new HttpResponseMessage(HttpStatusCode.OK);
+            HttpResponseMessage resp = new(HttpStatusCode.OK);
 
             resp.Content = new StringContent(JsonSerializer.Serialize(read));
 
@@ -132,7 +132,7 @@ namespace Durable.Lock.Api
                 lockRes.Add(client.ExecuteRead(lockOp));
             }
 
-            HttpResponseMessage resp = new HttpResponseMessage(HttpStatusCode.OK);
+            HttpResponseMessage resp = new(HttpStatusCode.OK);
 
             while (lockRes.Count > 0)
             {
@@ -160,11 +160,12 @@ namespace Durable.Lock.Api
         {
             EntityId entityId = new(lockName, $"{lockType}@{lockId}");
 
+            //await client.SignalEntityAsync(entityId, Constants.DeleteLock);
             await client.SignalEntityAsync(entityId, Constants.DeleteLock);
 
             EntityStateResponse<LockState> ent = await client.ReadEntityStateAsync<LockState>(entityId);
 
-            if (ent.EntityExists)
+            if (!ent.EntityExists)
             {
                 return new(HttpStatusCode.Accepted);
             }
@@ -194,7 +195,7 @@ namespace Durable.Lock.Api
 
                 foreach (LockOperation lockOp in lockOps)
                 {
-                    lockResponses.Add(context.CallSubOrchestratorAsync<LockOperationResult>("SubLockOrchestration", Guid.NewGuid().ToString(), lockOp));
+                    lockResponses.Add(context.CallSubOrchestratorAsync<LockOperationResult>("SubLockOrchestration", context.NewGuid().ToString(), lockOp));
                 }
 
                 await Task.WhenAll(lockResponses);
@@ -222,7 +223,7 @@ namespace Durable.Lock.Api
 
                     foreach (LockOperationResult lockOp in successLi)
                     {
-                        unlockResponses.Add(context.CallSubOrchestratorAsync<LockOperationResult>("SubUnlockOrchestration", Guid.NewGuid().ToString(), lockOp));
+                        unlockResponses.Add(context.CallSubOrchestratorAsync<LockOperationResult>("SubUnlockOrchestration", context.NewGuid().ToString(), lockOp));
                     }
 
                     while (unlockResponses.Count > 0)
@@ -275,7 +276,10 @@ namespace Durable.Lock.Api
                 {
                     Task<LockOperationResult> res = await Task.WhenAny(unlockResponses);
 
-                    resLi.Add(res.Result);
+                    if (res.Result != null)
+                    {
+                        resLi.Add(res.Result);
+                    }
 
                     unlockResponses.Remove(res);
                 }

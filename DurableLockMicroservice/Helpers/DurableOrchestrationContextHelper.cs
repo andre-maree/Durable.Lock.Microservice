@@ -27,7 +27,7 @@ namespace Durable.Lock.Api
             {
                 using (await context.LockAsync(entityId))
                 {
-                    LockOperationResult lockOperationResult = new LockOperationResult()
+                    LockOperationResult lockOperationResult = new()
                     {
                         LockDate = context.CurrentUtcDateTime,
                         User = lockOp.User,
@@ -36,7 +36,7 @@ namespace Durable.Lock.Api
                         LockType = lockOp.LockType
                     };
 
-                    LockState lockState = await context.CallEntityAsync<LockState>(entityId, operartionName, lockOperationResult);
+                    LockState lockState = await context.CallEntityAsync<LockState>(entityId, operartionName, (lockOperationResult, lockOp.Key));
 
                     if (lockState == null)
                     {

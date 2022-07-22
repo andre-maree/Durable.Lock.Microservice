@@ -14,7 +14,7 @@ namespace Durable.Lock.Api
         /// Generic re-usable lock for a shared class library
         /// </summary>
         /// <param name="ctx">DurableEntityContext</param>
-        public static void CreateLock(this IDurableEntityContext ctx, string operartionName, LockOperationResult lockOpRes)
+        public static void CreateLock(this IDurableEntityContext ctx, (LockOperationResult lockOpRes, string lockKey) tuple)
         {
             switch (ctx.OperationName)
             {
@@ -25,9 +25,14 @@ namespace Durable.Lock.Api
 
                         if (!lockState.IsLocked)
                         {
-                            lockState.User = lockOpRes.User;
-                            lockState.LockDate = lockOpRes.LockDate;
+                            lockState.User = tuple.lockOpRes.User;
+                            lockState.LockDate = tuple.lockOpRes.LockDate;
                             lockState.IsLocked = true;
+
+                            //if (!string.IsNullOrWhiteSpace(tuple.lockKey))
+                            //{
+                                lockState.LockKey = tuple.lockKey;
+                            //}
 
                             ctx.SetState(lockState);
                         }
@@ -41,19 +46,24 @@ namespace Durable.Lock.Api
                     {
                         LockState lockState = ctx.GetState<LockState>();
 
-                        if(lockState is null)
+                        if ((lockState is null) || (!string.IsNullOrWhiteSpace(lockState.LockKey) && !lockState.LockKey.Equals(tuple.lockKey)))
                         {
                             ctx.Return(null);
 
                             break;
                         }
 
-                        lockState.User = lockOpRes.User;
-                        lockState.LockDate = lockOpRes.LockDate;
+                        //if (!string.IsNullOrWhiteSpace(lockState.LockKey) && !lockState.LockKey.Equals(lockKey))
+                        //{
+
+                        //}
+
+                        lockState.User = tuple.lockOpRes.User;
+                        lockState.LockDate = tuple.lockOpRes.LockDate;
                         lockState.IsLocked = false;
 
                         ctx.SetState(lockState);
-                        
+
                         ctx.Return(lockState);
 
                         break;
@@ -61,6 +71,15 @@ namespace Durable.Lock.Api
 
                 case Constants.DeleteLock:
                     {
+                        LockState lockState = ctx.GetState<LockState>(); 
+                        
+                        if ((lockState is null) || (!string.IsNullOrWhiteSpace(lockState.LockKey) && !lockState.LockKey.Equals(tuple.lockKey)))
+                        {
+                            ctx.Return(null);
+
+                            break;
+                        }
+
                         ctx.DeleteState();
 
                         break;
