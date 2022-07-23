@@ -46,7 +46,7 @@ namespace Durable.Lock.Api
                     {
                         LockState lockState = ctx.GetState<LockState>();
 
-                        if ((lockState is null) || (!string.IsNullOrWhiteSpace(lockState.LockKey) && !lockState.LockKey.Equals(tuple.lockKey)))
+                        if ((lockState is null) || CheckLockKey(tuple, lockState))
                         {
                             ctx.Return(null);
 
@@ -73,7 +73,7 @@ namespace Durable.Lock.Api
                     {
                         LockState lockState = ctx.GetState<LockState>(); 
                         
-                        if ((lockState is null) || (!string.IsNullOrWhiteSpace(lockState.LockKey) && !lockState.LockKey.Equals(tuple.lockKey)))
+                        if ((lockState is null) || CheckLockKey(tuple, lockState))
                         {
                             ctx.Return(null);
 
@@ -86,6 +86,9 @@ namespace Durable.Lock.Api
                     }
             }
         }
+
+        private static bool CheckLockKey((LockOperationResult lockOpRes, string lockKey) tuple,LockState lockState) => 
+            !string.IsNullOrWhiteSpace(lockState.LockKey) && !lockState.LockKey.Equals(tuple.lockKey);
 
         #endregion
     }
