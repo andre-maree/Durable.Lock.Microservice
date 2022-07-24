@@ -1,5 +1,6 @@
 ﻿using Durable.Lock.Models;
 using Microsoft.Azure.WebJobs.Extensions.DurableTask;
+using System;
 
 namespace Durable.Lock.Api
 {
@@ -14,7 +15,7 @@ namespace Durable.Lock.Api
         /// Generic re-usable lock for a shared class library
         /// </summary>
         /// <param name="ctx">DurableEntityContext</param>
-        public static void CreateLock(this IDurableEntityContext ctx, (LockOperationResult lockOpRes, string lockKey) tuple)
+        public static void CreateLock(this IDurableEntityContext ctx, LockOperationResult lockOpRes)
         {
             switch (ctx.OperationName)
             {
@@ -25,13 +26,13 @@ namespace Durable.Lock.Api
 
                         if (!lockState.IsLocked)
                         {
-                            lockState.User = tuple.lockOpRes.User;
-                            lockState.LockDate = tuple.lockOpRes.LockDate;
+                            lockState.User = lockOpRes.User;
+                            lockState.LockDate = lockOpRes.LockDate;
                             lockState.IsLocked = true;
 
                             //if (!string.IsNullOrWhiteSpace(tuple.lockKey))
                             //{
-                                lockState.LockKey = tuple.lockKey;
+                            lockState.LockKey = lockOpRes.Key;
                             //}
 
                             ctx.SetState(lockState);
@@ -46,20 +47,15 @@ namespace Durable.Lock.Api
                     {
                         LockState lockState = ctx.GetState<LockState>();
 
-                        if ((lockState is null) || CheckLockKey(tuple, lockState))
+                        if ((lockState is null) || LockKeyFail(lockOpRes, lockState))
                         {
                             ctx.Return(null);
 
                             break;
                         }
 
-                        //if (!string.IsNullOrWhiteSpace(lockState.LockKey) && !lockState.LockKey.Equals(lockKey))
-                        //{
-
-                        //}
-
-                        lockState.User = tuple.lockOpRes.User;
-                        lockState.LockDate = tuple.lockOpRes.LockDate;
+                        lockState.User = lockOpRes.User;
+                        lockState.LockDate = lockOpRes.LockDate;
                         lockState.IsLocked = false;
 
                         ctx.SetState(lockState);
@@ -71,24 +67,48 @@ namespace Durable.Lock.Api
 
                 case Constants.DeleteLock:
                     {
-                        LockState lockState = ctx.GetState<LockState>(); 
-                        
-                        if ((lockState is null) || CheckLockKey(tuple, lockState))
-                        {
-                            ctx.Return(null);
+                        LockState lockState = ctx.GetState<LockState>();
 
+                        if (lockState is null)
+                        {
+                            ctx.Return(404);
+                            break;
+                        }
+
+                        if (LockKeyFail(lockOpRes, lockState))
+                        {
+                            ctx.Return(409);
                             break;
                         }
 
                         ctx.DeleteState();
+
+                        ctx.Return(200);
 
                         break;
                     }
             }
         }
 
-        private static bool CheckLockKey((LockOperationResult lockOpRes, string lockKey) tuple,LockState lockState) => 
-            !string.IsNullOrWhiteSpace(lockState.LockKey) && !lockState.LockKey.Equals(tuple.lockKey);
+        private static bool LockKeyFail(LockOperationResult lockOpRes, LockState lockState)
+        {
+            if (!string.IsNullOrWhiteSpace(lockState.LockKey))
+            {
+                if (lockState.LockKey.Equals(lockOpRes.Key))
+                {
+                    return false;
+                }
+
+                if (lockOpRes.Key != null && lockOpRes.Key.Equals(Environment.GetEnvironmentVariable("MasterLockKey")))
+                {
+                    return false;
+                }
+
+                return true;
+            }
+
+            return false;
+        }
 
         #endregion
     }

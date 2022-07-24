@@ -9,9 +9,80 @@ using System.Threading.Tasks;
 namespace LockTest
 {
     [TestClass]
-    public class UnitTest1
+    public class LockTests
     {
         private static HttpClient HttpClient = new();
+
+        [TestMethod]
+        public async Task MasterKeyTest()
+        {
+            string lockType = "project";
+            string lockName = "GenericLock";
+            string key = "mykey123";
+            string masterkey = "640e8034-d749-433f-ad6f-30532c3a33a3";
+
+            try
+            {
+                List<LockOperation> lockOps = new()
+                {
+                    new LockOperation() { LockId = "a1", LockType = lockType, User = "user1", LockName = lockName, Key = key }
+                };
+
+                await DeleteLock(lockOps[0], null);
+
+                //lock with mykey
+                var setLockResult = await HttpClient.PostAsJsonAsync("http://localhost:7071/Lock/1000", lockOps);
+                LockResultResponse result = JsonSerializer.Deserialize<LockResultResponse>(await setLockResult.Content.ReadAsStringAsync());
+
+                //unlock with masterkey
+                lockOps[0].Key = masterkey;
+                setLockResult = await HttpClient.PostAsJsonAsync("http://localhost:7071/UnLock/1000", lockOps);
+                result = JsonSerializer.Deserialize<LockResultResponse>(await setLockResult.Content.ReadAsStringAsync());
+
+                Assert.IsTrue(setLockResult.StatusCode == System.Net.HttpStatusCode.OK && result.Locks.Exists(t => t.IsLocked == false));
+
+                //lock with mykey
+                setLockResult = await HttpClient.PostAsJsonAsync("http://localhost:7071/Lock/1000", lockOps);
+                result = JsonSerializer.Deserialize<LockResultResponse>(await setLockResult.Content.ReadAsStringAsync());
+
+                //delete wirh masterkey
+                await DeleteLock(lockOps[0], true);
+            }
+            catch (Exception)
+            {
+                throw;
+            }
+        }
+
+        [TestMethod]
+        public async Task DeleteTest()
+        {
+            string lockType = "project";
+            string lockName = "GenericLock";
+            string key = "mykey123";
+
+            try
+            {
+                List<LockOperation> lockOps = new()
+                {
+                    new LockOperation() { LockId = "a1", LockType = lockType, User = "user1", LockName = lockName, Key = key }
+                };
+
+                await DeleteLock(lockOps[0], null);
+
+                var setLockResult = await HttpClient.PostAsJsonAsync("http://localhost:7071/Lock/1000", lockOps);
+
+                lockOps[0].Key = null;
+                await DeleteLock(lockOps[0], false);
+
+                lockOps[0].Key = key;
+                await DeleteLock(lockOps[0], true);
+            }
+            catch (Exception)
+            {
+                throw;
+            }
+        }
 
         [TestMethod]
         public async Task TestLockAndUnlockWithKey()
@@ -28,34 +99,13 @@ namespace LockTest
                     new LockOperation() { LockId = "a1", LockType = lockType, User = "user1", LockName = lockName, Key = key }
                 };
 
-                //delete the lock to start from scratch
-                HttpResponseMessage del1 = await HttpClient.GetAsync($"http://localhost:7071/DeleteLock/{lockName}/{lockType}/a1");
-
-                if (del1.StatusCode == System.Net.HttpStatusCode.Accepted)
-                {
-                    while (true)
-                    {
-                        await Task.Delay(1000);
-
-                        HttpResponseMessage readres = await HttpClient.GetAsync($"http://localhost:7071/ReadLock/{lockName}/{lockType}/a1");
-                        var read = JsonSerializer.Deserialize<LockOperationResult>(await readres.Content.ReadAsStringAsync());
-
-                        if (read?.User is null)
-                        {
-                            break;
-                        }
-                    }
-                }
-                else if (del1.StatusCode != System.Net.HttpStatusCode.OK)
-                {
-                    Assert.Fail();
-                }
+                await DeleteLock(lockOps[0], null);
 
                 //lock it x2 to force a conflict //////////////////////////////////////////////////////
-                var setLockResult = HttpClient.PostAsJsonAsync("http://localhost:7071/Lock/1000", lockOps);
+                var setLockResult = await HttpClient.PostAsJsonAsync("http://localhost:7071/Lock/1000", lockOps);
                 //var resLocks3 = HttpClient.PostAsJsonAsync("http://localhost:7071/Lock/1000", lockOps);
 
-                LockResultResponse result = JsonSerializer.Deserialize<LockResultResponse>(await setLockResult.Result.Content.ReadAsStringAsync());
+                LockResultResponse result = JsonSerializer.Deserialize<LockResultResponse>(await setLockResult.Content.ReadAsStringAsync());
 
                 //unlock the 3 locks, wait 150 seconds to ensure an 200 result and not a 202 ///////////
                 lockOps[0].Key = null;
@@ -66,12 +116,9 @@ namespace LockTest
                 //there should be no locks returned
                 Assert.IsTrue(unLockResponse.StatusCode == System.Net.HttpStatusCode.OK && unLockResult.Locks.Count == 0);
 
-                //delete should not work without the key
-                var delfail = await HttpClient.GetAsync($"http://localhost:7071/DeleteLock/{lockName}/{lockType}/a1");
+                await DeleteLock(lockOps[0], false);
 
-                Assert.IsTrue(delfail.StatusCode == System.Net.HttpStatusCode.OK || delfail.StatusCode == System.Net.HttpStatusCode.Accepted);
-
-                //unlock with the key should work
+                //unlock with the key should work 
                 lockOps[0].Key = key;
                 unLockResponse = await HttpClient.PostAsJsonAsync("http://localhost:7071/unLock/150", lockOps);
 
@@ -79,10 +126,34 @@ namespace LockTest
 
                 //there should be 1 lock returned unlocked
                 Assert.IsTrue(unLockResponse.StatusCode == System.Net.HttpStatusCode.OK && unLockResult.Locks[0].IsLocked == false);
+
+                await DeleteLock(lockOps[0], true);
             }
             catch (Exception)
             {
                 throw;
+            }
+        }
+
+        private static async Task DeleteLock(LockOperation lockOp, bool? shouldDelete)
+        {
+            //delete should not work without the key
+            var delfail = await HttpClient.PostAsJsonAsync($"http://localhost:7071/DeleteLock/100", lockOp);
+            var res = await delfail.Content.ReadAsStringAsync();
+
+            int delResult = JsonSerializer.Deserialize<int>(res);
+
+            if (shouldDelete == null)
+            {
+                Assert.IsTrue(delfail.StatusCode == System.Net.HttpStatusCode.OK && (delResult == 200 || delResult == 404));
+            }
+            else if (shouldDelete.Value)
+            {
+                Assert.IsTrue(delfail.StatusCode == System.Net.HttpStatusCode.OK && delResult == 200);
+            }
+            else
+            {
+                Assert.IsTrue(delfail.StatusCode == System.Net.HttpStatusCode.OK && delResult == 409);
             }
         }
 
@@ -128,27 +199,7 @@ namespace LockTest
                 };
 
                 //delete the lock to start from scratch
-                HttpResponseMessage del1 = await HttpClient.GetAsync($"http://localhost:7071/DeleteLock/{lockName}/{lockType}/a1");
-
-                if (del1.StatusCode == System.Net.HttpStatusCode.Accepted)
-                {
-                    while (true)
-                    {
-                        await Task.Delay(1000);
-
-                        HttpResponseMessage readres = await HttpClient.GetAsync($"http://localhost:7071/ReadLock/{lockName}/{lockType}/a1");
-                        var read = JsonSerializer.Deserialize<LockOperationResult>(await readres.Content.ReadAsStringAsync());
-
-                        if (read?.User is null)
-                        {
-                            break;
-                        }
-                    }
-                }
-                else if (del1.StatusCode != System.Net.HttpStatusCode.OK)
-                {
-                    Assert.Fail();
-                }
+                await DeleteLock(lockOps[0], null);
 
                 //lock it x2 to force a conflict //////////////////////////////////////////////////////
                 var resLocks2 = HttpClient.PostAsJsonAsync("http://localhost:7071/Lock/1000", lockOps);
@@ -187,14 +238,9 @@ namespace LockTest
                 };
 
                 //delete these 3 locks to start from scratch
-                HttpResponseMessage del1 = await HttpClient.GetAsync($"http://localhost:7071/DeleteLock/{lockName}/{lockType}/a1");
-                HttpResponseMessage del2 = await HttpClient.GetAsync($"http://localhost:7071/DeleteLock/{lockName}/{lockType}/a2");
-                HttpResponseMessage del3 = await HttpClient.GetAsync($"http://localhost:7071/DeleteLock/{lockName}/{lockType}/a3");
-
-                //check the http result of the 3 deletes, it can be a 200 or 201
-                Assert.IsTrue(del1.StatusCode == System.Net.HttpStatusCode.OK || del1.StatusCode == System.Net.HttpStatusCode.Accepted);
-                Assert.IsTrue(del2.StatusCode == System.Net.HttpStatusCode.OK || del2.StatusCode == System.Net.HttpStatusCode.Accepted);
-                Assert.IsTrue(del3.StatusCode == System.Net.HttpStatusCode.OK || del3.StatusCode == System.Net.HttpStatusCode.Accepted);
+                await DeleteLock(lockOps[0], null);
+                await DeleteLock(lockOps[1], null);
+                await DeleteLock(lockOps[2], null);
 
                 //poll to check that all 3 deletes were successful /////////////////////////////////////////////////////////////////////////////
                 HttpResponseMessage readres = await HttpClient.PostAsJsonAsync("http://localhost:7071/ReadLocks", lockOps);
@@ -293,13 +339,9 @@ namespace LockTest
                 Assert.IsTrue(reads.FindAll(l => !l.LockId.Equals("a1") && !l.IsLocked).Count == 2);
 
                 //delete the 3 locks //////////////////////////////////////////////////////////////////////////
-                del1 = await HttpClient.GetAsync($"http://localhost:7071/DeleteLock/{lockName}/{lockType}/a1");
-                del2 = await HttpClient.GetAsync($"http://localhost:7071/DeleteLock/{lockName}/{lockType}/a2");
-                del3 = await HttpClient.GetAsync($"http://localhost:7071/DeleteLock/{lockName}/{lockType}/a3");
-
-                Assert.IsTrue(del1.StatusCode == System.Net.HttpStatusCode.OK || del1.StatusCode == System.Net.HttpStatusCode.Accepted);
-                Assert.IsTrue(del2.StatusCode == System.Net.HttpStatusCode.OK || del2.StatusCode == System.Net.HttpStatusCode.Accepted);
-                Assert.IsTrue(del3.StatusCode == System.Net.HttpStatusCode.OK || del3.StatusCode == System.Net.HttpStatusCode.Accepted);
+                await DeleteLock(lockOps[0], true);
+                await DeleteLock(lockOps[1], true);
+                await DeleteLock(lockOps[2], true);
 
 
                 //poll to check that all 3 deletes were successful /////////////////////////////////////////////////////////////////////////////

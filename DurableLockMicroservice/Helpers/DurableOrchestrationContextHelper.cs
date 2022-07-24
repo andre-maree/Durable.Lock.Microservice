@@ -10,7 +10,7 @@ namespace Durable.Lock.Api
     public static class DurableOrchestrationContextHelper
     {
         #region DurableOrchestrationContext helpers
-
+        
         /// <summary>
         /// This calls back to the defined lock for this lock type in the client code
         /// </summary>
@@ -33,10 +33,11 @@ namespace Durable.Lock.Api
                         User = lockOp.User,
                         LockId = lockOp.LockId,
                         LockName = lockOp.LockName,
-                        LockType = lockOp.LockType
+                        LockType = lockOp.LockType,
+                        Key = lockOp.Key
                     };
 
-                    LockState lockState = await context.CallEntityAsync<LockState>(entityId, operartionName, (lockOperationResult, lockOp.Key));
+                    LockState lockState = await context.CallEntityAsync<LockState>(entityId, operartionName, lockOperationResult);
 
                     if (lockState == null)
                     {

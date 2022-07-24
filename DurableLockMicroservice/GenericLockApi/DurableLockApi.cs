@@ -103,9 +103,10 @@ namespace Durable.Lock.Api
         {
             LockOperationResult read = await client.ExecuteRead(new LockOperation() { LockName = lockName, LockType = lockType, LockId = lockId });
 
-            HttpResponseMessage resp = new(HttpStatusCode.OK);
-
-            resp.Content = new StringContent(JsonSerializer.Serialize(read));
+            HttpResponseMessage resp = new(HttpStatusCode.OK)
+            {
+                Content = new StringContent(JsonSerializer.Serialize(read))
+            };
 
             return resp;
         }
@@ -149,33 +150,49 @@ namespace Durable.Lock.Api
         /// <summary>
         /// Delete lock state with DurableClient
         /// </summary>
-        /// <param name="lockId">Lock Id to lock on</param>
+        /// <param name="req"></param>
+        /// <param name="client"></param>
+        /// <param name="lockName"></param>
+        /// <param name="lockType"></param>
+        /// <param name="lockId"></param>
+        /// <param name="waitForResultSeconds"></param>
         /// <returns></returns>
         [FunctionName("DeleteLock")]
-        public static async Task<HttpResponseMessage> DeleteLock([HttpTrigger(AuthorizationLevel.Anonymous, "get", "post", Route = "DeleteLock/{LockName}/{LockType}/{LockId}")] HttpRequestMessage req,
-                                                                 [DurableClient] IDurableEntityClient client,
-                                                                 string lockName,
-                                                                 string lockType,
-                                                                 string lockId)
+        public static async Task<HttpResponseMessage> DeleteLock([HttpTrigger(AuthorizationLevel.Anonymous, "get", "post", Route = "DeleteLock/{waitForResultSeconds:int?}")] HttpRequestMessage req,
+                                                                 [DurableClient] IDurableOrchestrationClient client,
+                                                                 int? waitForResultSeconds)
         {
-            EntityId entityId = new(lockName, $"{lockType}@{lockId}");
+            string input = await req.Content.ReadAsStringAsync();
 
-            //await client.SignalEntityAsync(entityId, Constants.DeleteLock);
-            await client.SignalEntityAsync(entityId, Constants.DeleteLock);
+            LockOperation lockOp = JsonSerializer.Deserialize<LockOperation>(input);
 
-            EntityStateResponse<LockState> ent = await client.ReadEntityStateAsync<LockState>(entityId);
+            string instanceId = await client.StartNewAsync("DeleteOrchestration", null, lockOp);
 
-            if (!ent.EntityExists)
-            {
-                return new(HttpStatusCode.Accepted);
-            }
-
-            return new(HttpStatusCode.OK);
+            return await client.WaitForCompletionOrCreateCheckStatusResponseAsync(req,
+                                                                                   instanceId,
+                                                                                   TimeSpan.FromSeconds(waitForResultSeconds is null
+                                                                                   ? 5
+                                                                                   : waitForResultSeconds.Value));
         }
 
         #endregion
 
         #region Orchestrations
+
+        /// <summary>
+        /// Delete orchestration with DurableOrchestrationContext
+        /// </summary>
+        /// <returns></returns>
+        [Deterministic]
+        [FunctionName("DeleteOrchestration")]
+        public static async Task<int> DeleteOrchestration([OrchestrationTrigger] IDurableOrchestrationContext context)
+        {
+            LockOperation lockOp = context.GetInput<LockOperation>();
+
+            EntityId entityId = new(lockOp.LockName, $"{lockOp.LockType}@{lockOp.LockId}");
+
+            return await context.CallEntityAsync<int>(entityId, Constants.DeleteLock, lockOp);
+        }
 
         /// <summary>
         /// Lock orchestration with DurableOrchestrationContext
