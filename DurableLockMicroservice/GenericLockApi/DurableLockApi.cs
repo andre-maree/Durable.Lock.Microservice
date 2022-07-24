@@ -68,7 +68,7 @@ namespace Durable.Lock.Api
 
                 string input = await req.Content.ReadAsStringAsync();
 
-                List<LockOperation> lockOps = JsonSerializer.Deserialize<List<LockOperation>>(input);
+                List<LockOperationWithKey> lockOps = JsonSerializer.Deserialize<List<LockOperationWithKey>>(input);
 
                 string guid = Guid.NewGuid().ToString();
 
@@ -101,7 +101,7 @@ namespace Durable.Lock.Api
                                                                string lockType,
                                                                string lockId)
         {
-            LockOperationResult read = await client.ExecuteRead(new LockOperation() { LockName = lockName, LockType = lockType, LockId = lockId });
+            LockOperationResult read = await client.ExecuteRead(new LockOperationWithKey() { LockName = lockName, LockType = lockType, LockId = lockId });
 
             HttpResponseMessage resp = new(HttpStatusCode.OK)
             {
@@ -123,12 +123,12 @@ namespace Durable.Lock.Api
 
             string input = await req.Content.ReadAsStringAsync();
 
-            List<LockOperation> lockOps = JsonSerializer.Deserialize<List<LockOperation>>(input);
+            List<LockOperationWithKey> lockOps = JsonSerializer.Deserialize<List<LockOperationWithKey>>(input);
 
             List<Task<LockOperationResult>> lockRes = new();
             List<LockOperationResult> lockResDto = new();
 
-            foreach (LockOperation lockOp in lockOps)
+            foreach (LockOperationWithKey lockOp in lockOps)
             {
                 lockRes.Add(client.ExecuteRead(lockOp));
             }
@@ -164,7 +164,7 @@ namespace Durable.Lock.Api
         {
             string input = await req.Content.ReadAsStringAsync();
 
-            LockOperation lockOp = JsonSerializer.Deserialize<LockOperation>(input);
+            LockOperationWithKey lockOp = JsonSerializer.Deserialize<LockOperationWithKey>(input);
 
             string instanceId = await client.StartNewAsync("DeleteOrchestration", null, lockOp);
 
@@ -187,11 +187,11 @@ namespace Durable.Lock.Api
         [FunctionName("DeleteOrchestration")]
         public static async Task<int> DeleteOrchestration([OrchestrationTrigger] IDurableOrchestrationContext context)
         {
-            LockOperation lockOp = context.GetInput<LockOperation>();
+            LockOperationWithKey lockOp = context.GetInput<LockOperationWithKey>();
 
             EntityId entityId = new(lockOp.LockName, $"{lockOp.LockType}@{lockOp.LockId}");
 
-            return await context.CallEntityAsync<int>(entityId, Constants.DeleteLock, lockOp);
+            return await context.CallEntityAsync<int>(entityId, Constants.DeleteLock, (lockOp, lockOp.Key));
         }
 
         /// <summary>
@@ -204,13 +204,13 @@ namespace Durable.Lock.Api
         {
             try
             {
-                List<LockOperation> lockOps = JsonSerializer.Deserialize<List<LockOperation>>(context.GetInput<string>());
+                List<LockOperationWithKey> lockOps = JsonSerializer.Deserialize<List<LockOperationWithKey>>(context.GetInput<string>());
 
                 List<Task<LockOperationResult>> lockResponses = new();
                 List<Task<LockOperationResult>> unlockResponses;
                 List<LockOperationResult> successLi = new();
 
-                foreach (LockOperation lockOp in lockOps)
+                foreach (LockOperationWithKey lockOp in lockOps)
                 {
                     lockResponses.Add(context.CallSubOrchestratorAsync<LockOperationResult>("SubLockOrchestration", context.NewGuid().ToString(), lockOp));
                 }
@@ -277,13 +277,13 @@ namespace Durable.Lock.Api
         {
             try
             {
-                List<LockOperation> lockOps = context.GetInput<List<LockOperation>>();
+                List<LockOperationWithKey> lockOps = context.GetInput<List<LockOperationWithKey>>();
 
                 List<Task<LockOperationResult>> unlockResponses = new();
 
                 List<LockOperationResult> resLi = new();
 
-                foreach (LockOperation lockOp in lockOps)
+                foreach (LockOperationWithKey lockOp in lockOps)
                 {
                     // call sub orch
                     unlockResponses.Add(context.CallSubOrchestratorAsync<LockOperationResult>("SubUnlockOrchestration", $"{lockOp.LockName}@{lockOp.LockType}@{lockOp.LockId}", lockOp));
@@ -317,7 +317,7 @@ namespace Durable.Lock.Api
         [FunctionName("SubLockOrchestration")]
         public static async Task<LockOperationResult> SubLockOrchestration([OrchestrationTrigger] IDurableOrchestrationContext context)
         {
-            LockOperation lockOp = context.GetInput<LockOperation>();
+            LockOperationWithKey lockOp = context.GetInput<LockOperationWithKey>();
 
             return await context.LockOrchestration(Constants.Lock, lockOp);
         }
@@ -330,7 +330,7 @@ namespace Durable.Lock.Api
         [FunctionName("SubUnlockOrchestration")]
         public static async Task<LockOperationResult> SubUnlockOrchestration([OrchestrationTrigger] IDurableOrchestrationContext context)
         {
-            LockOperation lockOp = context.GetInput<LockOperation>();
+            LockOperationWithKey lockOp = context.GetInput<LockOperationWithKey>();
 
             return await context.LockOrchestration(Constants.UnLock, lockOp);
         }

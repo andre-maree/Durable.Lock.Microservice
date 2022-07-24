@@ -15,7 +15,7 @@ namespace Durable.Lock.Api
         /// Generic re-usable lock for a shared class library
         /// </summary>
         /// <param name="ctx">DurableEntityContext</param>
-        public static void CreateLock(this IDurableEntityContext ctx, LockOperationResult lockOpRes)
+        public static void CreateLock(this IDurableEntityContext ctx, (LockOperationResult lockOpRes, string key) tuple)
         {
             switch (ctx.OperationName)
             {
@@ -26,13 +26,13 @@ namespace Durable.Lock.Api
 
                         if (!lockState.IsLocked)
                         {
-                            lockState.User = lockOpRes.User;
-                            lockState.LockDate = lockOpRes.LockDate;
+                            lockState.User = tuple.lockOpRes.User;
+                            lockState.LockDate = tuple.lockOpRes.LockDate;
                             lockState.IsLocked = true;
 
                             //if (!string.IsNullOrWhiteSpace(tuple.lockKey))
                             //{
-                            lockState.LockKey = lockOpRes.Key;
+                            lockState.LockKey = tuple.key;
                             //}
 
                             ctx.SetState(lockState);
@@ -47,15 +47,15 @@ namespace Durable.Lock.Api
                     {
                         LockState lockState = ctx.GetState<LockState>();
 
-                        if ((lockState is null) || LockKeyFail(lockOpRes, lockState))
+                        if ((lockState is null) || LockKeyFail(tuple.lockOpRes, lockState, tuple.key))
                         {
                             ctx.Return(null);
 
                             break;
                         }
 
-                        lockState.User = lockOpRes.User;
-                        lockState.LockDate = lockOpRes.LockDate;
+                        lockState.User = tuple.lockOpRes.User;
+                        lockState.LockDate = tuple.lockOpRes.LockDate;
                         lockState.IsLocked = false;
 
                         ctx.SetState(lockState);
@@ -75,7 +75,7 @@ namespace Durable.Lock.Api
                             break;
                         }
 
-                        if (LockKeyFail(lockOpRes, lockState))
+                        if (LockKeyFail(tuple.lockOpRes, lockState, tuple.key))
                         {
                             ctx.Return(409);
                             break;
@@ -90,16 +90,16 @@ namespace Durable.Lock.Api
             }
         }
 
-        private static bool LockKeyFail(LockOperationResult lockOpRes, LockState lockState)
+        private static bool LockKeyFail(LockOperationResult lockOpRes, LockState lockState, string key)
         {
             if (!string.IsNullOrWhiteSpace(lockState.LockKey))
             {
-                if (lockState.LockKey.Equals(lockOpRes.Key))
+                if (lockState.LockKey.Equals(key))
                 {
                     return false;
                 }
 
-                if (lockOpRes.Key != null && lockOpRes.Key.Equals(Environment.GetEnvironmentVariable("MasterLockKey")))
+                if (key != null && key.Equals(Environment.GetEnvironmentVariable("MasterLockKey")))
                 {
                     return false;
                 }

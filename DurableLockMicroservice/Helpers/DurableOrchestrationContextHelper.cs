@@ -17,7 +17,7 @@ namespace Durable.Lock.Api
         /// <param name="context">DurableOrchestrationContext</param>
         /// <param name="lockType">This string value is the name of the type of lock</param>
         /// <returns>True for locked and false for unlocked</returns>
-        public static async Task<LockOperationResult> LockOrchestration(this IDurableOrchestrationContext context, string operartionName, LockOperation lockOp)
+        public static async Task<LockOperationResult> LockOrchestration(this IDurableOrchestrationContext context, string operartionName, LockOperationWithKey lockOp)
         {
             //string operartionName = lockOp.IsLocked ? Constants.Lock : Constants.UnLock;
 
@@ -33,11 +33,11 @@ namespace Durable.Lock.Api
                         User = lockOp.User,
                         LockId = lockOp.LockId,
                         LockName = lockOp.LockName,
-                        LockType = lockOp.LockType,
-                        Key = lockOp.Key
+                        LockType = lockOp.LockType//,
+                        //Key = lockOp.Key
                     };
 
-                    LockState lockState = await context.CallEntityAsync<LockState>(entityId, operartionName, lockOperationResult);
+                    LockState lockState = await context.CallEntityAsync<LockState>(entityId, operartionName, (lockOperationResult, lockOp.Key));
 
                     if (lockState == null)
                     {

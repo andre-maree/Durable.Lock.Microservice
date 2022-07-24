@@ -12,32 +12,30 @@ namespace LockTest
     public class LockTests
     {
         private static HttpClient HttpClient = new();
+        private string lockType = "project";
+        private string lockName = "GenericLock";
+        private string key = "mykey123";
+        private string masterkey = "640e8034-d749-433f-ad6f-30532c3a33a3";
 
         [TestMethod]
         public async Task MasterKeyTest()
         {
-            string lockType = "project";
-            string lockName = "GenericLock";
-            string key = "mykey123";
-            string masterkey = "640e8034-d749-433f-ad6f-30532c3a33a3";
-
             try
             {
-                List<LockOperation> lockOps = new()
+                List<LockOperationWithKey> lockOps = new()
                 {
-                    new LockOperation() { LockId = "a1", LockType = lockType, User = "user1", LockName = lockName, Key = key }
+                    new LockOperationWithKey() { LockId = "a1", LockType = lockType, User = "user1", LockName = lockName, Key = key }
                 };
 
                 await DeleteLock(lockOps[0], null);
 
                 //lock with mykey
-                var setLockResult = await HttpClient.PostAsJsonAsync("http://localhost:7071/Lock/1000", lockOps);
-                LockResultResponse result = JsonSerializer.Deserialize<LockResultResponse>(await setLockResult.Content.ReadAsStringAsync());
-
+                await Lock(lockOps, 1);
+                
                 //unlock with masterkey
                 lockOps[0].Key = masterkey;
-                setLockResult = await HttpClient.PostAsJsonAsync("http://localhost:7071/UnLock/1000", lockOps);
-                result = JsonSerializer.Deserialize<LockResultResponse>(await setLockResult.Content.ReadAsStringAsync());
+                var setLockResult = await HttpClient.PostAsJsonAsync("http://localhost:7071/UnLock/1000", lockOps);
+                var result = JsonSerializer.Deserialize<LockResultResponse>(await setLockResult.Content.ReadAsStringAsync());
 
                 Assert.IsTrue(setLockResult.StatusCode == System.Net.HttpStatusCode.OK && result.Locks.Exists(t => t.IsLocked == false));
 
@@ -54,23 +52,27 @@ namespace LockTest
             }
         }
 
+        private static async Task Lock(List<LockOperationWithKey> lockOps, int lockCount)
+        {
+            HttpResponseMessage setLockResult = await HttpClient.PostAsJsonAsync("http://localhost:7071/Lock/1000", lockOps); 
+            LockResultResponse result = JsonSerializer.Deserialize<LockResultResponse>(await setLockResult.Content.ReadAsStringAsync());
+
+            Assert.IsTrue(setLockResult.StatusCode == System.Net.HttpStatusCode.OK && result.Locks.FindAll(l => l.IsLocked).Count == lockCount);
+        }
+
         [TestMethod]
         public async Task DeleteTest()
         {
-            string lockType = "project";
-            string lockName = "GenericLock";
-            string key = "mykey123";
-
             try
             {
-                List<LockOperation> lockOps = new()
+                List<LockOperationWithKey> lockOps = new()
                 {
-                    new LockOperation() { LockId = "a1", LockType = lockType, User = "user1", LockName = lockName, Key = key }
+                    new LockOperationWithKey() { LockId = "a1", LockType = lockType, User = "user1", LockName = lockName, Key = key }
                 };
 
                 await DeleteLock(lockOps[0], null);
 
-                var setLockResult = await HttpClient.PostAsJsonAsync("http://localhost:7071/Lock/1000", lockOps);
+                await Lock(lockOps, 1);
 
                 lockOps[0].Key = null;
                 await DeleteLock(lockOps[0], false);
@@ -89,23 +91,18 @@ namespace LockTest
         {
             try
             {
-                string lockType = "project";
-                string lockName = "GenericLock";
-                string key = "mykey123";
-
                 //create lock input test data
-                List<LockOperation> lockOps = new()
+                List<LockOperationWithKey> lockOps = new()
                 {
-                    new LockOperation() { LockId = "a1", LockType = lockType, User = "user1", LockName = lockName, Key = key }
+                    new LockOperationWithKey() { LockId = "a1", LockType = lockType, User = "user1", LockName = lockName, Key = key }
                 };
 
                 await DeleteLock(lockOps[0], null);
 
-                //lock it x2 to force a conflict //////////////////////////////////////////////////////
-                var setLockResult = await HttpClient.PostAsJsonAsync("http://localhost:7071/Lock/1000", lockOps);
-                //var resLocks3 = HttpClient.PostAsJsonAsync("http://localhost:7071/Lock/1000", lockOps);
+                await Lock(lockOps, 1);
 
-                LockResultResponse result = JsonSerializer.Deserialize<LockResultResponse>(await setLockResult.Content.ReadAsStringAsync());
+                var readres = await HttpClient.PostAsJsonAsync("http://localhost:7071/ReadLocks", lockOps);
+                var reads = JsonSerializer.Deserialize<List<LockOperationResult>>(await readres.Content.ReadAsStringAsync());
 
                 //unlock the 3 locks, wait 150 seconds to ensure an 200 result and not a 202 ///////////
                 lockOps[0].Key = null;
@@ -135,7 +132,7 @@ namespace LockTest
             }
         }
 
-        private static async Task DeleteLock(LockOperation lockOp, bool? shouldDelete)
+        private static async Task DeleteLock(LockOperationWithKey lockOp, bool? shouldDelete)
         {
             //delete should not work without the key
             var delfail = await HttpClient.PostAsJsonAsync($"http://localhost:7071/DeleteLock/100", lockOp);
@@ -189,25 +186,22 @@ namespace LockTest
         {
             try
             {
-                string lockType = "project";
-                string lockName = "GenericLock";
-
                 //create lock input test data
-                List<LockOperation> lockOps = new()
+                List<LockOperationWithKey> lockOps = new()
                 {
-                    new LockOperation() { LockId = "a1", LockType = lockType, User = "user1", LockName = lockName }//, Key = "mykey" }
+                    new LockOperationWithKey() { LockId = "a1", LockType = lockType, User = "user1", LockName = lockName }//, Key = "mykey" }
                 };
 
                 //delete the lock to start from scratch
                 await DeleteLock(lockOps[0], null);
 
                 //lock it x2 to force a conflict //////////////////////////////////////////////////////
-                var resLocks2 = HttpClient.PostAsJsonAsync("http://localhost:7071/Lock/1000", lockOps);
-                var resLocks3 = HttpClient.PostAsJsonAsync("http://localhost:7071/Lock/1000", lockOps);
+                var lock1 = HttpClient.PostAsJsonAsync("http://localhost:7071/Lock/1000", lockOps);
+                var lock2 = HttpClient.PostAsJsonAsync("http://localhost:7071/Lock/1000", lockOps);
 
-                LockResultResponse result = JsonSerializer.Deserialize<LockResultResponse>(await resLocks2.Result.Content.ReadAsStringAsync());
+                LockResultResponse result = JsonSerializer.Deserialize<LockResultResponse>(await lock1.Result.Content.ReadAsStringAsync());
 
-                LockResultResponse result2 = JsonSerializer.Deserialize<LockResultResponse>(await resLocks3.Result.Content.ReadAsStringAsync());
+                LockResultResponse result2 = JsonSerializer.Deserialize<LockResultResponse>(await lock2.Result.Content.ReadAsStringAsync());
 
                 //1 lock attempt should be successful and the other must be a conflict
                 Assert.IsTrue((result.HttpStatusCode == 201 && result2.HttpStatusCode == 409) || (result.HttpStatusCode == 409 && result2.HttpStatusCode == 201));
@@ -226,15 +220,12 @@ namespace LockTest
         {
             try
             {
-                string lockType = "project";
-                string lockName = "GenericLock";
-
                 //create 3 locks input test data
-                List<LockOperation> lockOps = new()
+                List<LockOperationWithKey> lockOps = new()
                 {
-                    new LockOperation() { LockId = "a1", LockType = lockType, User = "user1", LockName = lockName },
-                    new LockOperation() { LockId = "a2", LockType = lockType, User = "user2", LockName = lockName },
-                    new LockOperation() { LockId = "a3", LockType = lockType, User = "user3", LockName = lockName }
+                    new LockOperationWithKey() { LockId = "a1", LockType = lockType, User = "user1", LockName = lockName },
+                    new LockOperationWithKey() { LockId = "a2", LockType = lockType, User = "user2", LockName = lockName },
+                    new LockOperationWithKey() { LockId = "a3", LockType = lockType, User = "user3", LockName = lockName }
                 };
 
                 //delete these 3 locks to start from scratch
